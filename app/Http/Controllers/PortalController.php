@@ -1,0 +1,730 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Customer;
+use App\Models\Delivery;
+use App\Models\Employee;
+use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Order as PrintOrder;
+use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\Quotation;
+use App\Models\RawMaterial;
+use App\Models\Role;
+use App\Models\Setting;
+use App\Models\SubscriptionPlan;
+use App\Models\Supplier;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Models\Warehouse;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
+
+class PortalController extends Controller
+{
+    public function home(): View
+    {
+        return $this->renderPage('dashboard');
+    }
+
+    public function show(Request $request, string $page): View
+    {
+        abort_unless(array_key_exists($page, $this->pages()), 404);
+
+        return $this->renderPage($page);
+    }
+
+    private function renderPage(string $page): View
+    {
+        $tenant = Tenant::with('plan')->firstOrFail();
+        $pages = $this->pages();
+        $pageData = array_merge($this->pageData($page, $tenant), $this->pageActions($page));
+
+        return view('portal', [
+            'pages' => $pages,
+            'currentPage' => $page,
+            'pageMeta' => $pages[$page],
+            'pageData' => $pageData,
+            'workspace' => [
+                'name' => $tenant->name,
+                'role' => 'Tenant Owner',
+                'user' => User::where('tenant_id', $tenant->id)->first()?->name ?? 'Workspace User',
+                'status' => $tenant->is_active ? 'Workspace Active' : 'Workspace Inactive',
+            ],
+        ]);
+    }
+
+    private function pages(): array
+    {
+        return [
+            'dashboard' => ['label' => 'Dashboard', 'title' => 'Operations dashboard', 'icon' => 'home'],
+            'customers' => ['label' => 'Customers', 'title' => 'CRM and customer history', 'icon' => 'users'],
+            'suppliers' => ['label' => 'Suppliers', 'title' => 'Supplier network and payables', 'icon' => 'building'],
+            'products' => ['label' => 'Products', 'title' => 'Products and service presets', 'icon' => 'box'],
+            'raw-materials' => ['label' => 'Raw Materials', 'title' => 'Material catalog and reorder alerts', 'icon' => 'layers'],
+            'warehouses' => ['label' => 'Warehouses', 'title' => 'Warehouse and stock visibility', 'icon' => 'grid'],
+            'quotations' => ['label' => 'Quotations', 'title' => 'Estimate, approve, convert', 'icon' => 'quote'],
+            'orders' => ['label' => 'Orders', 'title' => 'Jobs, schedules, and production', 'icon' => 'clipboard'],
+            'purchases' => ['label' => 'Purchases', 'title' => 'POs, receiving, supplier payments', 'icon' => 'cart'],
+            'invoices' => ['label' => 'Invoices', 'title' => 'Billing and collections', 'icon' => 'invoice'],
+            'expenses' => ['label' => 'Expenses', 'title' => 'Operating cost control', 'icon' => 'wallet'],
+            'deliveries' => ['label' => 'Deliveries', 'title' => 'Dispatch, routes, and proof of delivery', 'icon' => 'truck'],
+            'reports' => ['label' => 'Reports', 'title' => 'Analytics, due reports, and profitability', 'icon' => 'chart'],
+            'users-roles' => ['label' => 'Users & Roles', 'title' => 'Tenant access and permissions', 'icon' => 'shield'],
+            'settings' => ['label' => 'Settings', 'title' => 'Tenant configuration and business profile', 'icon' => 'settings'],
+            'subscription' => ['label' => 'Subscription', 'title' => 'Plans, usage, and billing', 'icon' => 'spark'],
+        ];
+    }
+
+    private function pageData(string $page, Tenant $tenant): array
+    {
+        return match ($page) {
+            'dashboard' => $this->dashboardData($tenant),
+            'customers' => $this->customersData($tenant),
+            'suppliers' => $this->suppliersData($tenant),
+            'products' => $this->productsData($tenant),
+            'raw-materials' => $this->rawMaterialsData($tenant),
+            'warehouses' => $this->warehousesData($tenant),
+            'quotations' => $this->quotationsData($tenant),
+            'orders' => $this->ordersData($tenant),
+            'purchases' => $this->purchasesData($tenant),
+            'invoices' => $this->invoicesData($tenant),
+            'expenses' => $this->expensesData($tenant),
+            'deliveries' => $this->deliveriesData($tenant),
+            'reports' => $this->reportsData($tenant),
+            'users-roles' => $this->usersRolesData($tenant),
+            'settings' => $this->settingsData($tenant),
+            'subscription' => $this->subscriptionData($tenant),
+        };
+    }
+
+    private function pageActions(string $page): array
+    {
+        $createModules = ['customers', 'suppliers', 'products', 'raw-materials', 'warehouses', 'quotations', 'orders', 'purchases', 'invoices', 'expenses', 'deliveries'];
+
+        return [
+            'primary_action' => in_array($page, $createModules, true)
+                ? ['label' => $this->primaryActionLabel($page), 'url' => route('modules.create', $page)]
+                : match ($page) {
+                    'dashboard' => ['label' => 'Create Quotation', 'url' => route('modules.create', 'quotations')],
+                    'reports' => ['label' => 'Open Orders', 'url' => route('portal.page', 'orders')],
+                    'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
+                    'settings' => ['label' => 'Open Subscription', 'url' => route('portal.page', 'subscription')],
+                    'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
+                    default => null,
+                },
+            'secondary_action' => match ($page) {
+                'dashboard' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
+                'reports' => ['label' => 'Export Reports', 'url' => route('modules.export', 'invoices')],
+                'users-roles' => ['label' => 'Add Role', 'url' => route('modules.create', 'roles')],
+                'settings' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
+                'subscription' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
+                default => ['label' => 'Export ' . str($page)->headline(), 'url' => route('modules.export', $page)],
+            },
+            'export_url' => in_array($page, ['dashboard', 'users-roles', 'settings', 'subscription', 'reports'], true)
+                ? route('modules.export', match ($page) {
+                    'dashboard' => 'orders',
+                    'users-roles' => 'customers',
+                    'settings' => 'warehouses',
+                    'subscription' => 'invoices',
+                    'reports' => 'invoices',
+                })
+                : route('modules.export', $page),
+        ];
+    }
+
+    private function primaryActionLabel(string $page): string
+    {
+        return match ($page) {
+            'customers' => 'Add Customer',
+            'suppliers' => 'Add Supplier',
+            'products' => 'Add Product',
+            'raw-materials' => 'Add Material',
+            'warehouses' => 'Add Warehouse',
+            'quotations' => 'New Quotation',
+            'orders' => 'Create Order',
+            'purchases' => 'Create PO',
+            'invoices' => 'New Invoice',
+            'expenses' => 'Add Expense',
+            'deliveries' => 'Create Dispatch',
+            default => 'Create',
+        };
+    }
+
+    private function dashboardData(Tenant $tenant): array
+    {
+        $orders = PrintOrder::with('customer')->where('tenant_id', $tenant->id)->latest()->take(6)->get();
+
+        return [
+            'eyebrow' => 'Printing Press SaaS',
+            'headline' => 'Manage quotation, orders, production, inventory, finance, and delivery from one workspace.',
+            'description' => 'Live metrics are now coming from the ERP database instead of hardcoded template values.',
+            'actions' => ['Create Quotation', 'View Reports'],
+            'stats' => [
+                ['label' => 'Total Orders', 'value' => (string) PrintOrder::where('tenant_id', $tenant->id)->count(), 'note' => 'jobs tracked in ERP'],
+                ['label' => 'Active Customers', 'value' => (string) Customer::where('tenant_id', $tenant->id)->count(), 'note' => 'CRM records in workspace'],
+                ['label' => 'Pending Invoices', 'value' => '$' . number_format((float) Invoice::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'current receivable balance'],
+                ['label' => 'Low Stock Alerts', 'value' => (string) RawMaterial::where('tenant_id', $tenant->id)->whereColumn('current_stock', '<=', 'minimum_stock')->count(), 'note' => 'materials below threshold'],
+            ],
+            'feature_cards' => [
+                ['title' => 'Multi-tenant ready', 'text' => 'Tenant, users, plans, roles, and settings all exist in the database and are wired into the ERP.'],
+                ['title' => 'Production workflow', 'text' => 'Orders now have stage records in the database for pending, approval, printing, finishing, and dispatch flow.'],
+                ['title' => 'Finance visibility', 'text' => 'Invoices, payments, expenses, and supplier-linked purchases are seeded and queryable.'],
+            ],
+            'table' => [
+                'title' => 'Recent orders',
+                'columns' => ['Order', 'Customer', 'Job Title', 'Delivery Date', 'Amount', 'Status'],
+                'rows' => $orders->map(fn (PrintOrder $order) => [
+                    $order->order_number,
+                    $order->customer?->company_name ?? '-',
+                    $order->job_title,
+                    optional($order->expected_delivery_date)->format('M d, Y'),
+                    '$' . number_format((float) $order->total, 0),
+                    str($order->status)->headline()->toString(),
+                ])->all(),
+            ],
+            'side_panel' => [
+                'title' => 'MVP modules',
+                'items' => ['Customers', 'Suppliers', 'Products', 'Raw Materials', 'Warehouses', 'Quotations', 'Orders', 'Purchases', 'Invoices', 'Deliveries'],
+            ],
+        ];
+    }
+
+    private function customersData(Tenant $tenant): array
+    {
+        $customers = Customer::where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'CRM Module',
+            'headline' => 'Build customer records, inquiry tracking, follow-ups, notes, and order history.',
+            'description' => 'Customer listings and KPI cards are pulled directly from the customers and customer_interactions tables.',
+            'actions' => ['Add Customer', 'Export CRM'],
+            'stats' => [
+                ['label' => 'Total Customers', 'value' => (string) $customers->count(), 'note' => 'all customer records'],
+                ['label' => 'Active Customers', 'value' => (string) $customers->where('status', 'active')->count(), 'note' => 'currently active accounts'],
+                ['label' => 'VIP Customers', 'value' => (string) $customers->where('status', 'vip')->count(), 'note' => 'priority service clients'],
+                ['label' => 'Lead Records', 'value' => (string) $customers->where('status', 'lead')->count(), 'note' => 'not yet fully converted'],
+            ],
+            'table' => [
+                'title' => 'Customer directory',
+                'columns' => ['Code', 'Company', 'Contact Person', 'Phone', 'City', 'Status'],
+                'rows' => $customers->map(fn (Customer $customer) => [
+                    $customer->customer_code,
+                    $customer->company_name,
+                    $customer->contact_person,
+                    $customer->phone,
+                    $customer->city,
+                    str($customer->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $customers->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'CRM actions',
+                'items' => ['Customer notes', 'Inquiry history', 'Follow-up schedule', 'Quotation conversion', 'Order history'],
+            ],
+        ];
+    }
+
+    private function suppliersData(Tenant $tenant): array
+    {
+        $suppliers = Supplier::where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Supplier Management',
+            'headline' => 'Control supplier records, payable tracking, purchase history, and source materials.',
+            'description' => 'Supplier data is connected to purchase orders and can be extended into full payable workflows.',
+            'actions' => ['Add Supplier', 'Create PO'],
+            'stats' => [
+                ['label' => 'Suppliers', 'value' => (string) $suppliers->count(), 'note' => 'registered suppliers'],
+                ['label' => 'Preferred', 'value' => (string) $suppliers->where('status', 'preferred')->count(), 'note' => 'top-ranked vendors'],
+                ['label' => 'Open POs', 'value' => (string) PurchaseOrder::where('tenant_id', $tenant->id)->whereIn('status', ['draft', 'ordered', 'partial_received'])->count(), 'note' => 'awaiting full closure'],
+                ['label' => 'Supplier Due', 'value' => '$' . number_format((float) PurchaseOrder::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'payables total'],
+            ],
+            'table' => [
+                'title' => 'Supplier directory',
+                'columns' => ['Code', 'Company', 'Contact', 'Email', 'Phone', 'Status'],
+                'rows' => $suppliers->map(fn (Supplier $supplier) => [
+                    $supplier->supplier_code,
+                    $supplier->company_name,
+                    $supplier->contact_person,
+                    $supplier->email,
+                    $supplier->phone,
+                    str($supplier->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $suppliers->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Key workflows',
+                'items' => ['Supplier onboarding', 'Payable tracking', 'Material linkage', 'Purchase receiving', 'Supplier performance'],
+            ],
+        ];
+    }
+
+    private function productsData(Tenant $tenant): array
+    {
+        $products = Product::with('category')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Products & Services',
+            'headline' => 'Define print products, categories, base prices, units, and specification presets.',
+            'description' => 'Products are database-backed and connected to categories so quotations and orders can reference them cleanly.',
+            'actions' => ['Add Product', 'Manage Categories'],
+            'stats' => [
+                ['label' => 'Products', 'value' => (string) $products->count(), 'note' => 'service and item definitions'],
+                ['label' => 'Categories', 'value' => (string) $products->pluck('category_id')->filter()->unique()->count(), 'note' => 'active product groups'],
+                ['label' => 'Average Price', 'value' => '$' . number_format((float) $products->avg('base_price'), 2), 'note' => 'mean base price'],
+                ['label' => 'Active Products', 'value' => (string) $products->where('status', 'active')->count(), 'note' => 'currently sellable'],
+            ],
+            'table' => [
+                'title' => 'Product catalog',
+                'columns' => ['SKU', 'Name', 'Category', 'Unit', 'Base Price', 'Status'],
+                'rows' => $products->map(fn (Product $product) => [
+                    $product->sku,
+                    $product->name,
+                    $product->category?->name ?? '-',
+                    $product->unit,
+                    '$' . number_format((float) $product->base_price, 2),
+                    str($product->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $products->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Preset examples',
+                'items' => ['Business card', 'Brochure', 'Packaging box', 'Sticker label', 'Vinyl banner', 'Custom job'],
+            ],
+        ];
+    }
+
+    private function rawMaterialsData(Tenant $tenant): array
+    {
+        $materials = RawMaterial::where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Inventory Control',
+            'headline' => 'Track raw materials, stock levels, minimum thresholds, and average cost.',
+            'description' => 'Material counts, low-stock alerts, and stock values are coming from raw_materials and inventory_stocks.',
+            'actions' => ['Add Material', 'Stock Adjustment'],
+            'stats' => [
+                ['label' => 'Materials', 'value' => (string) $materials->count(), 'note' => 'catalogued raw materials'],
+                ['label' => 'Low Stock', 'value' => (string) $materials->filter(fn (RawMaterial $material) => $material->current_stock <= $material->minimum_stock)->count(), 'note' => 'needs reorder action'],
+                ['label' => 'Stock Value', 'value' => '$' . number_format((float) $materials->sum(fn (RawMaterial $material) => $material->current_stock * $material->average_cost), 0), 'note' => 'estimated inventory value'],
+                ['label' => 'Avg Cost', 'value' => '$' . number_format((float) $materials->avg('average_cost'), 2), 'note' => 'average material cost'],
+            ],
+            'table' => [
+                'title' => 'Material catalog',
+                'columns' => ['Code', 'Material', 'Unit', 'Current Stock', 'Minimum Stock', 'Status'],
+                'rows' => $materials->map(fn (RawMaterial $material) => [
+                    $material->code,
+                    $material->name,
+                    $material->unit,
+                    number_format((float) $material->current_stock, 2),
+                    number_format((float) $material->minimum_stock, 2),
+                    $material->current_stock <= $material->minimum_stock ? 'Low' : 'Healthy',
+                ])->all(),
+                'record_ids' => $materials->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Material examples',
+                'items' => ['Paper', 'Ink', 'Board', 'Glue', 'Plate', 'Finishing items'],
+            ],
+        ];
+    }
+
+    private function warehousesData(Tenant $tenant): array
+    {
+        $warehouses = Warehouse::with('stocks')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Warehouse Module',
+            'headline' => 'Monitor warehouse locations, manager assignments, stock positions, and reserved quantities.',
+            'description' => 'Warehouse records, stock counts, and reserved quantities are pulled from the inventory tables.',
+            'actions' => ['Add Warehouse', 'View Transactions'],
+            'stats' => [
+                ['label' => 'Warehouses', 'value' => (string) $warehouses->count(), 'note' => 'active storage locations'],
+                ['label' => 'Reserved Qty', 'value' => number_format((float) $warehouses->flatMap->stocks->sum('reserved_quantity'), 2), 'note' => 'material reserved for jobs'],
+                ['label' => 'Stock Lines', 'value' => (string) $warehouses->flatMap->stocks->count(), 'note' => 'warehouse stock rows'],
+                ['label' => 'Active Sites', 'value' => (string) $warehouses->where('status', 'active')->count(), 'note' => 'usable warehouse locations'],
+            ],
+            'table' => [
+                'title' => 'Warehouse directory',
+                'columns' => ['Code', 'Name', 'Manager', 'Address', 'Stock Lines', 'Status'],
+                'rows' => $warehouses->map(fn (Warehouse $warehouse) => [
+                    $warehouse->code,
+                    $warehouse->name,
+                    $warehouse->manager_name,
+                    $warehouse->address,
+                    (string) $warehouse->stocks->count(),
+                    str($warehouse->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $warehouses->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Warehouse actions',
+                'items' => ['Stock in/out', 'Reserve stock', 'Release stock', 'Adjustments', 'Transfer planning'],
+            ],
+        ];
+    }
+
+    private function quotationsData(Tenant $tenant): array
+    {
+        $quotations = Quotation::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Quotation Management',
+            'headline' => 'Create costed quotations with print specs, tax, discount, approvals, and conversion to order.',
+            'description' => 'Quotation records are now stored in quotations and quotation_items and linked to customers.',
+            'actions' => ['New Quotation', 'Convert Approved'],
+            'stats' => [
+                ['label' => 'Open Quotes', 'value' => (string) $quotations->whereIn('status', ['draft', 'sent'])->count(), 'note' => 'awaiting next action'],
+                ['label' => 'Approved', 'value' => (string) $quotations->where('status', 'approved')->count(), 'note' => 'ready for conversion'],
+                ['label' => 'Converted', 'value' => (string) $quotations->where('status', 'converted')->count(), 'note' => 'converted into orders'],
+                ['label' => 'Quote Value', 'value' => '$' . number_format((float) $quotations->sum('total'), 0), 'note' => 'total quotation pipeline'],
+            ],
+            'table' => [
+                'title' => 'Quotation list',
+                'columns' => ['Quote No', 'Customer', 'Inquiry Date', 'Valid Until', 'Total', 'Status'],
+                'rows' => $quotations->map(fn (Quotation $quotation) => [
+                    $quotation->quote_number,
+                    $quotation->customer?->company_name ?? '-',
+                    optional($quotation->inquiry_date)->format('M d, Y'),
+                    optional($quotation->valid_until)->format('M d, Y'),
+                    '$' . number_format((float) $quotation->total, 0),
+                    str($quotation->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $quotations->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Quote tools',
+                'items' => ['Print specs', 'Costing', 'Discount and tax', 'Approval flow', 'Convert to order'],
+            ],
+        ];
+    }
+
+    private function ordersData(Tenant $tenant): array
+    {
+        $orders = PrintOrder::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Order Management',
+            'headline' => 'Turn approved quotes into tracked print jobs with statuses, managers, and expected delivery.',
+            'description' => 'Orders are linked to customers, quotations, items, job stages, invoices, and deliveries inside the database.',
+            'actions' => ['Create Order', 'Assign Manager'],
+            'stats' => [
+                ['label' => 'Open Jobs', 'value' => (string) $orders->count(), 'note' => 'total orders in workspace'],
+                ['label' => 'In Production', 'value' => (string) $orders->where('status', 'printing')->count(), 'note' => 'currently on production floor'],
+                ['label' => 'Due This Week', 'value' => (string) $orders->filter(fn (PrintOrder $order) => optional($order->expected_delivery_date)?->isCurrentWeek())->count(), 'note' => 'delivery horizon'],
+                ['label' => 'Receivable', 'value' => '$' . number_format((float) $orders->sum('due_amount'), 0), 'note' => 'order-level due amount'],
+            ],
+            'table' => [
+                'title' => 'Order board',
+                'columns' => ['Order No', 'Customer', 'Job Title', 'Order Date', 'Expected Delivery', 'Status'],
+                'rows' => $orders->map(fn (PrintOrder $order) => [
+                    $order->order_number,
+                    $order->customer?->company_name ?? '-',
+                    $order->job_title,
+                    optional($order->order_date)->format('M d, Y'),
+                    optional($order->expected_delivery_date)->format('M d, Y'),
+                    str($order->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $orders->pluck('id')->all(),
+                'status_values' => $orders->pluck('status')->all(),
+                'status_options' => ['pending', 'approval', 'printing', 'finishing', 'delivered', 'cancelled'],
+            ],
+            'side_panel' => [
+                'title' => 'Production stages',
+                'items' => ['Pending', 'Design', 'Approval', 'Plate / Prepress', 'Printing', 'Cutting', 'Finishing', 'Packing', 'Ready Dispatch', 'Delivered'],
+            ],
+        ];
+    }
+
+    private function purchasesData(Tenant $tenant): array
+    {
+        $purchaseOrders = PurchaseOrder::with(['supplier', 'warehouse'])->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Purchase Management',
+            'headline' => 'Manage purchase orders, receiving, stock updates, and supplier payment tracking.',
+            'description' => 'Purchases are linked to suppliers, warehouses, material items, and payable balances.',
+            'actions' => ['Create PO', 'Receive Goods'],
+            'stats' => [
+                ['label' => 'Open POs', 'value' => (string) $purchaseOrders->whereIn('status', ['draft', 'ordered', 'partial_received'])->count(), 'note' => 'orders not fully closed'],
+                ['label' => 'Received', 'value' => (string) $purchaseOrders->where('status', 'received')->count(), 'note' => 'fully received POs'],
+                ['label' => 'Committed Value', 'value' => '$' . number_format((float) $purchaseOrders->sum('total'), 0), 'note' => 'gross purchase value'],
+                ['label' => 'Due Amount', 'value' => '$' . number_format((float) $purchaseOrders->sum('due_amount'), 0), 'note' => 'supplier payable total'],
+            ],
+            'table' => [
+                'title' => 'Purchase order list',
+                'columns' => ['PO No', 'Supplier', 'Warehouse', 'Expected Date', 'Total', 'Status'],
+                'rows' => $purchaseOrders->map(fn (PurchaseOrder $purchaseOrder) => [
+                    $purchaseOrder->po_number,
+                    $purchaseOrder->supplier?->company_name ?? '-',
+                    $purchaseOrder->warehouse?->name ?? '-',
+                    optional($purchaseOrder->expected_date)->format('M d, Y'),
+                    '$' . number_format((float) $purchaseOrder->total, 0),
+                    str($purchaseOrder->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $purchaseOrders->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'PO flow',
+                'items' => ['Draft', 'Ordered', 'Partial received', 'Received', 'Cancelled'],
+            ],
+        ];
+    }
+
+    private function invoicesData(Tenant $tenant): array
+    {
+        $invoices = Invoice::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Financial Management',
+            'headline' => 'Issue invoices, track due dates, log payments, and monitor collection performance.',
+            'description' => 'Invoice totals and due balances are now read from the invoices and payments tables.',
+            'actions' => ['New Invoice', 'Record Payment'],
+            'stats' => [
+                ['label' => 'Invoices Issued', 'value' => (string) $invoices->count(), 'note' => 'all generated invoices'],
+                ['label' => 'Collected', 'value' => '$' . number_format((float) $invoices->sum('paid_amount'), 0), 'note' => 'payments received'],
+                ['label' => 'Due Amount', 'value' => '$' . number_format((float) $invoices->sum('due_amount'), 0), 'note' => 'outstanding balance'],
+                ['label' => 'Paid Invoices', 'value' => (string) $invoices->where('status', 'paid')->count(), 'note' => 'closed billing documents'],
+            ],
+            'table' => [
+                'title' => 'Invoice register',
+                'columns' => ['Invoice No', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Status'],
+                'rows' => $invoices->map(fn (Invoice $invoice) => [
+                    $invoice->invoice_number,
+                    $invoice->customer?->company_name ?? '-',
+                    optional($invoice->invoice_date)->format('M d, Y'),
+                    optional($invoice->due_date)->format('M d, Y'),
+                    '$' . number_format((float) $invoice->total, 0),
+                    str($invoice->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $invoices->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Finance tools',
+                'items' => ['Invoice issue', 'Payment record', 'Due report', 'Cash ledger', 'Order-wise profit'],
+            ],
+        ];
+    }
+
+    private function expensesData(Tenant $tenant): array
+    {
+        $expenses = Expense::where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Expense Tracking',
+            'headline' => 'Track operating expenses, categories, reference numbers, and approval notes.',
+            'description' => 'Expenses are stored and aggregated from the expenses table for accounting visibility.',
+            'actions' => ['Add Expense', 'Export Ledger'],
+            'stats' => [
+                ['label' => 'Expenses', 'value' => (string) $expenses->count(), 'note' => 'expense entries recorded'],
+                ['label' => 'Total Spend', 'value' => '$' . number_format((float) $expenses->sum('amount'), 0), 'note' => 'current expense total'],
+                ['label' => 'Utilities', 'value' => '$' . number_format((float) $expenses->where('category', 'Utility')->sum('amount'), 0), 'note' => 'utility costs'],
+                ['label' => 'Transport', 'value' => '$' . number_format((float) $expenses->where('category', 'Transport')->sum('amount'), 0), 'note' => 'dispatch-related spend'],
+            ],
+            'table' => [
+                'title' => 'Expense ledger',
+                'columns' => ['Date', 'Category', 'Title', 'Reference', 'Amount', 'Status'],
+                'rows' => $expenses->map(fn (Expense $expense) => [
+                    optional($expense->expense_date)->format('M d, Y'),
+                    $expense->category,
+                    $expense->title,
+                    $expense->reference_no,
+                    '$' . number_format((float) $expense->amount, 0),
+                    'Recorded',
+                ])->all(),
+                'record_ids' => $expenses->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Expense categories',
+                'items' => ['Utility', 'Transport', 'Maintenance', 'Salary support', 'Office', 'Miscellaneous'],
+            ],
+        ];
+    }
+
+    private function deliveriesData(Tenant $tenant): array
+    {
+        $deliveries = Delivery::with('order')->where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Transport & Dispatch',
+            'headline' => 'Assign deliveries, monitor route notes, transport cost, POD, and delivery status.',
+            'description' => 'Dispatch data is coming from deliveries tied to ERP orders and assigned tenant users.',
+            'actions' => ['Create Dispatch', 'Assign Driver'],
+            'stats' => [
+                ['label' => 'Deliveries', 'value' => (string) $deliveries->count(), 'note' => 'all dispatch records'],
+                ['label' => 'Delivered', 'value' => (string) $deliveries->where('status', 'delivered')->count(), 'note' => 'completed dispatches'],
+                ['label' => 'Out for Delivery', 'value' => (string) $deliveries->where('status', 'out_for_delivery')->count(), 'note' => 'live route movement'],
+                ['label' => 'Transport Cost', 'value' => '$' . number_format((float) $deliveries->sum('transport_cost'), 0), 'note' => 'dispatch cost total'],
+            ],
+            'table' => [
+                'title' => 'Delivery list',
+                'columns' => ['Delivery No', 'Order', 'Delivery Date', 'Vehicle', 'Transport Cost', 'Status'],
+                'rows' => $deliveries->map(fn (Delivery $delivery) => [
+                    $delivery->delivery_number,
+                    $delivery->order?->order_number ?? '-',
+                    optional($delivery->delivery_date)->format('M d, Y'),
+                    $delivery->vehicle_no,
+                    '$' . number_format((float) $delivery->transport_cost, 0),
+                    str($delivery->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $deliveries->pluck('id')->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Delivery statuses',
+                'items' => ['Pending', 'Assigned', 'Out for delivery', 'Delivered', 'Failed', 'Returned'],
+            ],
+        ];
+    }
+
+    private function reportsData(Tenant $tenant): array
+    {
+        $sales = (float) Invoice::where('tenant_id', $tenant->id)->sum('total');
+        $expenses = (float) Expense::where('tenant_id', $tenant->id)->sum('amount');
+
+        return [
+            'eyebrow' => 'Analytics & Reporting',
+            'headline' => 'Review daily orders, sales, dues, supplier payables, stock, and profitability.',
+            'description' => 'These report cards are computed from the ERP records currently stored in the database.',
+            'actions' => ['Run Report', 'Export Excel'],
+            'stats' => [
+                ['label' => 'Sales Total', 'value' => '$' . number_format($sales, 0), 'note' => 'invoice-backed sales'],
+                ['label' => 'Expense Total', 'value' => '$' . number_format($expenses, 0), 'note' => 'recorded operating costs'],
+                ['label' => 'Receivables', 'value' => '$' . number_format((float) Invoice::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'customer dues'],
+                ['label' => 'Profit Estimate', 'value' => '$' . number_format($sales - $expenses, 0), 'note' => 'sales minus expenses'],
+            ],
+            'table' => [
+                'title' => 'Available reports',
+                'columns' => ['Report', 'Description', 'Source', 'Cadence', 'Format', 'Status'],
+                'rows' => [
+                    ['Sales Report', 'Invoice totals by customer and date', 'Invoices', 'Daily', 'Excel/PDF', 'Ready'],
+                    ['Due Report', 'Outstanding invoice balances', 'Invoices', 'Daily', 'Excel', 'Ready'],
+                    ['Inventory Report', 'Material stock and low alerts', 'Raw Materials', 'Live', 'Excel', 'Ready'],
+                    ['Purchase Payables', 'Supplier due balances', 'Purchase Orders', 'Daily', 'Excel', 'Ready'],
+                ],
+            ],
+            'side_panel' => [
+                'title' => 'Core reports',
+                'items' => ['Daily orders', 'Sales report', 'Due report', 'Supplier payables', 'Stock report', 'Low material report', 'Customer-wise sales', 'Order profitability'],
+            ],
+        ];
+    }
+
+    private function usersRolesData(Tenant $tenant): array
+    {
+        $users = User::with(['roles', 'permissions'])->where('tenant_id', $tenant->id)->latest()->get();
+        $roles = Role::where('tenant_id', $tenant->id)->latest()->get();
+
+        return [
+            'eyebrow' => 'Access Management',
+            'headline' => 'Manage tenant users, roles, permissions, departments, and operational restrictions.',
+            'description' => 'Users, roles, permissions, and employees are all persisted in the database and linked together.',
+            'actions' => ['Add User', 'Add Role'],
+            'stats' => [
+                ['label' => 'Users', 'value' => (string) $users->count(), 'note' => 'tenant users'],
+                ['label' => 'Roles', 'value' => (string) Role::where('tenant_id', $tenant->id)->count(), 'note' => 'role profiles'],
+                ['label' => 'Employees', 'value' => (string) Employee::where('tenant_id', $tenant->id)->count(), 'note' => 'employee records'],
+                ['label' => 'Permissions', 'value' => (string) $users->flatMap->permissions->pluck('id')->unique()->count(), 'note' => 'granted permissions'],
+            ],
+            'table' => [
+                'title' => 'User directory',
+                'columns' => ['Name', 'Email', 'Phone', 'Role', 'Last Login', 'Status'],
+                'rows' => $users->map(fn (User $user) => [
+                    $user->name,
+                    $user->email,
+                    $user->phone,
+                    $user->roles->first()?->name ?? '-',
+                    optional($user->last_login_at)->diffForHumans(),
+                    str($user->status)->headline()->toString(),
+                ])->all(),
+                'record_ids' => $users->pluck('id')->all(),
+                'module' => 'users',
+            ],
+            'secondary_table' => [
+                'title' => 'Role directory',
+                'columns' => ['Role Name', 'Guard', 'Created'],
+                'rows' => $roles->map(fn (Role $role) => [
+                    $role->name,
+                    $role->guard_name,
+                    optional($role->created_at)->format('M d, Y'),
+                ])->all(),
+                'record_ids' => $roles->pluck('id')->all(),
+                'module' => 'roles',
+            ],
+            'side_panel' => [
+                'title' => 'Roles',
+                'items' => Role::where('tenant_id', $tenant->id)->pluck('name')->all(),
+            ],
+        ];
+    }
+
+    private function settingsData(Tenant $tenant): array
+    {
+        $settings = Setting::where('tenant_id', $tenant->id)->get();
+
+        return [
+            'eyebrow' => 'Workspace Settings',
+            'headline' => 'Configure tenant profile, branches, tax rules, numbering, and operational preferences.',
+            'description' => 'Business profile and document series are now stored per tenant in the settings table.',
+            'actions' => ['Save Settings', 'Preview Branding'],
+            'stats' => [
+                ['label' => 'Setting Groups', 'value' => (string) $settings->count(), 'note' => 'saved tenant settings'],
+                ['label' => 'Branches', 'value' => (string) Warehouse::where('tenant_id', $tenant->id)->count(), 'note' => 'configured operational locations'],
+                ['label' => 'Users', 'value' => (string) User::where('tenant_id', $tenant->id)->count(), 'note' => 'workspace staff count'],
+                ['label' => 'Current Plan', 'value' => $tenant->plan?->name ?? 'N/A', 'note' => 'linked subscription plan'],
+            ],
+            'table' => [
+                'title' => 'Configuration groups',
+                'columns' => ['Key', 'Summary', 'Scope', 'Tenant', 'Updated', 'Status'],
+                'rows' => $settings->map(fn (Setting $setting) => [
+                    $setting->key,
+                    implode(', ', array_keys($setting->value_json ?? [])),
+                    'Tenant',
+                    $tenant->name,
+                    optional($setting->updated_at)->format('M d, Y'),
+                    'Configured',
+                ])->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Settings areas',
+                'items' => ['Business profile', 'Branding', 'Tax setup', 'Document numbering', 'Approval rules', 'Branch preferences'],
+            ],
+        ];
+    }
+
+    private function subscriptionData(Tenant $tenant): array
+    {
+        $plans = SubscriptionPlan::latest()->get();
+
+        return [
+            'eyebrow' => 'SaaS Billing',
+            'headline' => 'Manage plans, trials, billing cycle, usage limits, upgrades, and tenant status.',
+            'description' => 'Subscription plans and tenant plan assignment are both stored in the database now.',
+            'actions' => ['Upgrade Plan', 'Billing History'],
+            'stats' => [
+                ['label' => 'Current Plan', 'value' => $tenant->plan?->name ?? 'N/A', 'note' => 'tenant subscription'],
+                ['label' => 'Plan Status', 'value' => str($tenant->subscription_status)->headline()->toString(), 'note' => 'tenant billing state'],
+                ['label' => 'Users Used', 'value' => User::where('tenant_id', $tenant->id)->count() . '/' . ($tenant->plan?->max_users ?? '-'), 'note' => 'seat usage'],
+                ['label' => 'Warehouses', 'value' => (string) Warehouse::where('tenant_id', $tenant->id)->count(), 'note' => 'resource usage'],
+            ],
+            'table' => [
+                'title' => 'Plan comparison',
+                'columns' => ['Plan', 'Users', 'Orders / Month', 'Warehouses', 'Storage', 'Status'],
+                'rows' => $plans->map(fn (SubscriptionPlan $plan) => [
+                    $plan->name,
+                    (string) $plan->max_users,
+                    $plan->max_orders_per_month ? (string) $plan->max_orders_per_month : 'Unlimited',
+                    $plan->max_warehouses ? (string) $plan->max_warehouses : 'Unlimited',
+                    $plan->max_storage_mb ? $plan->max_storage_mb . ' MB' : 'Unlimited',
+                    '$' . number_format((float) $plan->monthly_price, 0) . '/mo',
+                ])->all(),
+            ],
+            'side_panel' => [
+                'title' => 'Billing controls',
+                'items' => ['Trial period', 'Monthly or yearly billing', 'Upgrade / downgrade', 'Usage limits', 'Suspension rules'],
+            ],
+        ];
+    }
+}

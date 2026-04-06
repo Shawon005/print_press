@@ -1,0 +1,24 @@
+<?php
+
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ModuleRecordController;
+use App\Http\Controllers\PortalController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('/login', [AuthController::class, 'create'])->name('login');
+    Route::post('/login', [AuthController::class, 'store'])->name('login.store');
+});
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/', [PortalController::class, 'home'])->name('portal.home');
+    Route::get('/modules/{module}/create', [ModuleRecordController::class, 'create'])->name('modules.create');
+    Route::get('/modules/{module}/{id}/edit', [ModuleRecordController::class, 'edit'])->name('modules.edit');
+    Route::post('/modules/{module}', [ModuleRecordController::class, 'store'])->name('modules.store');
+    Route::put('/modules/{module}/{id}', [ModuleRecordController::class, 'update'])->name('modules.update');
+    Route::delete('/modules/{module}/{id}', [ModuleRecordController::class, 'destroy'])->name('modules.destroy');
+    Route::patch('/orders/{id}/status', [ModuleRecordController::class, 'updateOrderStatus'])->name('orders.status');
+    Route::get('/modules/{module}/export', [ModuleRecordController::class, 'export'])->name('modules.export');
+    Route::get('/{page}', [PortalController::class, 'show'])->name('portal.page');
+    Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
+});
