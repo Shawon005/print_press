@@ -14,11 +14,13 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'tenant_id',
         'supplier_id',
+        'job_order_id',
         'warehouse_id',
         'po_number',
         'order_date',
         'expected_date',
         'status',
+        'is_auto_suggested',
         'subtotal',
         'discount',
         'tax',
@@ -34,6 +36,7 @@ class PurchaseOrder extends Model
         return [
             'order_date' => 'date',
             'expected_date' => 'date',
+            'is_auto_suggested' => 'boolean',
         ];
     }
 
@@ -45,6 +48,11 @@ class PurchaseOrder extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function jobOrder(): BelongsTo
+    {
+        return $this->belongsTo(JobOrder::class);
     }
 
     public function items(): HasMany

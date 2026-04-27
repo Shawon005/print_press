@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
@@ -18,7 +18,7 @@
                             </svg>
                         </div>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">SaaS ERP</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">Printing Press</p>
                             <h1 class="text-xl font-black tracking-tight text-slate-900">{{ $workspace['name'] }}</h1>
                         </div>
                     </a>
@@ -103,17 +103,23 @@
                                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                                     {{ $workspace['status'] }}
                                 </button>
+                                <a href="{{ $workspace['company_profile_url'] }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Company Profile</a>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <button type="submit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Logout</button>
                                 </form>
                                 <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white">
-                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
-                                    </div>
+                                    @if (!empty($workspace['company_logo']))
+                                        <img src="{{ $workspace['company_logo'] }}" alt="Company logo" class="h-11 w-11 rounded-full border border-slate-200 object-cover">
+                                    @else
+                                        <div class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white">
+                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
+                                        </div>
+                                    @endif
                                     <div>
                                         <p class="text-sm font-bold text-slate-900">{{ $workspace['user'] }}</p>
-                                        <p class="text-xs text-slate-500">{{ $workspace['role'] }}</p>
+                                        <p class="text-xs text-slate-500">{{ $workspace['company_name'] }}</p>
+                                        <p class="text-xs text-slate-400">{{ $workspace['role'] }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -126,37 +132,11 @@
                                 {{ session('success') }}
                             </div>
                         @endif
-
-                        <section class="hero-panel overflow-hidden rounded-[32px] p-6 md:p-8">
-                            <div class="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-                                <div>
-                                    <h3 class="max-w-4xl text-4xl font-black leading-tight tracking-tight text-slate-950 md:text-5xl">{{ $pageData['headline'] }}</h3>
-                                    <p class="mt-5 max-w-3xl text-base leading-7 text-slate-700">{{ $pageData['description'] }}</p>
-                                    <div class="mt-8 flex flex-wrap gap-3">
-                                        @if (!empty($pageData['primary_action']))
-                                            <a href="{{ $pageData['primary_action']['url'] }}" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $pageData['primary_action']['label'] }}</a>
-                                        @endif
-                                        @if (!empty($pageData['secondary_action']))
-                                            <a href="{{ $pageData['secondary_action']['url'] }}" class="rounded-2xl border border-slate-300 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-800">{{ $pageData['secondary_action']['label'] }}</a>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div class="surface-card p-5">
-                                    <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Workspace Focus</p>
-                                    <div class="mt-5 space-y-3">
-                                        @foreach (array_slice($pageData['stats'], 0, 3) as $stat)
-                                            <div class="rounded-2xl bg-slate-50 px-4 py-4">
-                                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $stat['label'] }}</p>
-                                                <p class="mt-2 text-3xl font-black tracking-tight text-slate-900">{{ $stat['value'] }}</p>
-                                                <p class="mt-1 text-sm text-slate-500">{{ $stat['note'] }}</p>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
+                        @if (session('error'))
+                            <div class="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
+                                {{ session('error') }}
                             </div>
-                        </section>
-
+                        @endif
                         <section class="grid gap-4 xl:grid-cols-4">
                             @foreach ($pageData['stats'] as $stat)
                                 <article class="metric-card">
@@ -173,6 +153,22 @@
                                 </article>
                             @endforeach
                         </section>
+                        <section class="hero-panel overflow-hidden rounded-[32px] p-6 md:p-8 ">
+                            <div class="grid gap-6  justify-end">
+                                <div>
+                                    <div class=" flex flex-wrap gap-3">
+                                        @if (!empty($pageData['primary_action']))
+                                            <a href="{{ $pageData['primary_action']['url'] }}" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $pageData['primary_action']['label'] }}</a>
+                                        @endif
+                                        @if (!empty($pageData['secondary_action']))
+                                            <a href="{{ $pageData['secondary_action']['url'] }}" class="rounded-2xl border border-slate-300 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-800">{{ $pageData['secondary_action']['label'] }}</a>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                      
 
                         @if (!empty($pageData['feature_cards']))
                             <section class="grid gap-6 xl:grid-cols-3">
@@ -186,14 +182,79 @@
                             </section>
                         @endif
 
+                        @if ($currentPage === 'settings' && !empty($pageData['settings_tabs']))
+                            <section class="grid gap-6" x-data="{ activeTab: '{{ $pageData['settings_tabs'][0]['key'] ?? 'paper-types' }}' }">
+                                <article class="surface-card p-6">
+                                    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Settings Masters</p>
+                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">Paper, Ink, Sheet, Unit</h3>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach ($pageData['settings_tabs'] as $tab)
+                                                <button type="button" @click="activeTab = '{{ $tab['key'] }}'" :class="activeTab === '{{ $tab['key'] }}' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-2xl px-4 py-2 text-sm font-semibold">{{ $tab['label'] }}</button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    @foreach ($pageData['settings_tabs'] as $tab)
+                                        <div x-show="activeTab === '{{ $tab['key'] }}'" x-cloak>
+                                            <div class="mb-4 flex justify-end">
+                                                <a href="{{ $tab['create_url'] }}" class="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Add {{ $tab['label'] }}</a>
+                                            </div>
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full border-separate border-spacing-y-3 text-left">
+                                                    <thead>
+                                                        <tr class="text-sm font-semibold text-slate-500">
+                                                            @foreach ($tab['columns'] as $column)
+                                                                <th class="px-4">{{ $column }}</th>
+                                                            @endforeach
+                                                            <th class="px-4 text-right">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($tab['rows'] as $row)
+                                                            <tr class="bg-slate-50 text-sm text-slate-700 shadow-sm">
+                                                                @foreach ($row['cells'] as $cell)
+                                                                    <td class="px-4 py-4 {{ $loop->first ? 'rounded-l-2xl font-semibold text-slate-900' : '' }}">{{ $cell }}</td>
+                                                                @endforeach
+                                                                <td class="rounded-r-2xl px-4 py-4 text-right">
+                                                                    <div class="flex flex-wrap justify-end gap-2">
+                                                                        <a href="{{ route('modules.print', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
+                                                                        <a href="{{ route('modules.edit', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
+                                                                        <form method="POST" action="{{ route('modules.destroy', [$row['module'], $row['record_id']]) }}" onsubmit="return confirm('Delete this record?')">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
+                                                                        </form>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </article>
+                            </section>
+                        @else
                         <section class="grid gap-6 ">
                             <article class="surface-card p-6">
+                                @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
+                                    <form id="quotation-batch-print-form" method="POST" action="{{ route('quotations.print-batch') }}">
+                                        @csrf
+                                    </form>
+                                @endif
                                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Data View</p>
                                         <h3 class="text-2xl font-black tracking-tight text-slate-900">{{ $pageData['table']['title'] }}</h3>
                                     </div>
                                     <div class="flex flex-col gap-3 sm:flex-row">
+                                        @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
+                                            <button type="submit" form="quotation-batch-print-form" class="rounded-2xl bg-slate-950 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Print Selected</button>
+                                        @endif
                                         <input type="text" placeholder="Search records" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
                                         @if (!empty($pageData['export_url']))
                                             <a href="{{ $pageData['export_url'] }}" class="rounded-2xl bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-600/20">Export to Excel</a>
@@ -205,6 +266,11 @@
                                     <table class="min-w-full border-separate border-spacing-y-3 text-left">
                                         <thead>
                                             <tr class="text-sm font-semibold text-slate-500">
+                                                @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
+                                                    <th class="px-4">
+                                                        <input id="quotation-select-all" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500">
+                                                    </th>
+                                                @endif
                                                 @foreach ($pageData['table']['columns'] as $column)
                                                     <th class="px-4">{{ $column }}</th>
                                                 @endforeach
@@ -215,7 +281,13 @@
                                         </thead>
                                         <tbody>
                                             @foreach ($pageData['table']['rows'] as $rowIndex => $row)
+                                                @php($rowModule = $pageData['table']['module_map'][$rowIndex] ?? ($pageData['table']['module'] ?? $currentPage))
                                                 <tr class="bg-slate-50 text-sm text-slate-700 shadow-sm">
+                                                    @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
+                                                        <td class="px-4 py-4">
+                                                            <input type="checkbox" name="quotation_ids[]" value="{{ $pageData['table']['record_ids'][$rowIndex] }}" form="quotation-batch-print-form" class="quotation-select-item h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500">
+                                                        </td>
+                                                    @endif
                                                     @foreach ($row as $cell)
                                                         <td class="px-4 py-4 {{ $loop->first ? 'rounded-l-2xl font-semibold text-slate-900' : '' }} {{ $loop->last ? 'rounded-r-2xl' : '' }}">
                                                             @if ($loop->last)
@@ -240,8 +312,12 @@
                                                                         <button type="submit" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Update</button>
                                                                     </form>
                                                                 @endif
-                                                                <a href="{{ route('modules.edit', [$pageData['table']['module'] ?? $currentPage, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
-                                                                <form method="POST" action="{{ route('modules.destroy', [$pageData['table']['module'] ?? $currentPage, $pageData['table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this record?')">
+                                                                @php($printableModules = ['customers', 'suppliers', 'products', 'raw-materials', 'warehouses', 'quotations', 'orders', 'purchases', 'invoices', 'deliveries', 'expenses', 'users', 'roles', 'paper-types', 'ink-types', 'standard-sheets', 'units'])
+                                                                @if (in_array($rowModule, $printableModules, true))
+                                                                    <a href="{{ route('modules.print', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
+                                                                @endif
+                                                                <a href="{{ route('modules.edit', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
+                                                                <form method="POST" action="{{ route('modules.destroy', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this record?')">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
@@ -284,6 +360,7 @@
                                                         @endforeach
                                                         <td class="rounded-r-2xl px-4 py-4 text-right">
                                                             <div class="flex flex-wrap justify-end gap-2">
+                                                                <a href="{{ route('modules.print', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
                                                                 <a href="{{ route('modules.edit', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
                                                                 <form method="POST" action="{{ route('modules.destroy', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this role?')">
                                                                     @csrf
@@ -318,9 +395,35 @@
                                 </article>
                             </div> -->
                         </section>
+                        @endif
                     </div>
                 </main>
             </div>
         </div>
+        @if ($currentPage === 'quotations')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const selectAll = document.getElementById('quotation-select-all');
+                    const items = Array.from(document.querySelectorAll('.quotation-select-item'));
+                    if (!selectAll || items.length === 0) {
+                        return;
+                    }
+
+                    selectAll.addEventListener('change', function () {
+                        items.forEach(function (item) {
+                            item.checked = selectAll.checked;
+                        });
+                    });
+
+                    items.forEach(function (item) {
+                        item.addEventListener('change', function () {
+                            selectAll.checked = items.every(function (current) {
+                                return current.checked;
+                            });
+                        });
+                    });
+                });
+            </script>
+        @endif
     </body>
 </html>

@@ -2,31 +2,72 @@
 
 namespace App\Http\Controllers;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Customer;
 use App\Models\Delivery;
 use App\Models\Expense;
 use App\Models\Invoice;
+use App\Models\InkType;
+use App\Models\JobCalculation;
+use App\Models\JobOrder;
+use App\Models\JobPayment;
 use App\Models\Order;
+use App\Models\PaperStock;
+use App\Models\PaperType;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\PurchaseOrder as JobPurchaseOrder;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
+use App\Models\QuotationItem;
 use App\Models\RawMaterial;
 use App\Models\RawMaterialCategory;
+use App\Models\Setting;
+use App\Models\StandardSheet;
 use App\Models\Supplier;
 use App\Models\Tenant;
+use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\View\View;
+use App\Services\PrintCalculationService;
 
 class ModuleRecordController extends Controller
 {
+    public function __construct(private readonly PrintCalculationService $printCalculationService)
+    {
+    }
+
     public function create(string $module): View
     {
+        if ($module === 'orders') {
+            return view('modules.orders-form', [
+                'module' => $module,
+                'customers' => Customer::orderBy('company_name')->get(),
+                'paperTypes' => PaperType::orderBy('name')->get(),
+                'inkTypes' => InkType::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
+                'standardSheets' => StandardSheet::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
+                'record' => null,
+                'formAction' => route('modules.store', $module),
+                'formMethod' => 'POST',
+            ]);
+        }
+        if ($module === 'quotations') {
+            return view('modules.quotations-form', [
+                'module' => $module,
+                'customers' => Customer::orderBy('company_name')->get(),
+                'record' => null,
+                'items' => [],
+                'formAction' => route('modules.store', $module),
+                'formMethod' => 'POST',
+            ]);
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -42,6 +83,38 @@ class ModuleRecordController extends Controller
 
     public function edit(string $module, int $id): View
     {
+        if ($module === 'orders') {
+            $record = JobOrder::findOrFail($id);
+
+            return view('modules.orders-form', [
+                'module' => $module,
+                'customers' => Customer::orderBy('company_name')->get(),
+                'paperTypes' => PaperType::orderBy('name')->get(),
+                'inkTypes' => InkType::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
+                'standardSheets' => StandardSheet::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
+                'record' => $record,
+                'formAction' => route('modules.update', [$module, $id]),
+                'formMethod' => 'PUT',
+            ]);
+        }
+        if ($module === 'quotations') {
+            $record = Quotation::with('items')->findOrFail($id);
+
+            return view('modules.quotations-form', [
+                'module' => $module,
+                'customers' => Customer::orderBy('company_name')->get(),
+                'record' => $record,
+                'items' => $record->items->map(fn (QuotationItem $item) => [
+                    'item_name' => $item->item_name,
+                    'description' => $item->description,
+                    'quantity' => (float) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                ])->all(),
+                'formAction' => route('modules.update', [$module, $id]),
+                'formMethod' => 'PUT',
+            ]);
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -59,6 +132,116 @@ class ModuleRecordController extends Controller
 
     public function store(Request $request, string $module): RedirectResponse
     {
+        if ($module === 'orders') {
+            $tenant = $this->tenant();
+            $user = $request->user();
+
+            $data = $request->validate($this->printingOrderRules());
+
+            DB::transaction(function () use ($data, $tenant, $user): void {
+                $calculation = $this->printCalculationService->calculate([
+                    'total_pages' => $data['total_pages'],
+                    'page_size' => $data['page_size'],
+                    'custom_width' => $data['custom_width'] ?? null,
+                    'custom_height' => $data['custom_height'] ?? null,
+                    'total_copies' => $data['total_copies'],
+                    'standard_sheet_size' => $data['standard_sheet_size'],
+                    'colors' => $data['colors'],
+                    'wastage_per_color' => config('printing.wastage.default_per_color_percent'),
+                    'printing_style' => $data['printing_style'],
+                ]);
+
+                $order = JobOrder::create([
+                    'tenant_id' => $tenant->id,
+                    'job_number' => $data['job_number'],
+                    'job_title' => $data['job_title'],
+                    'customer_id' => $data['customer_id'],
+                    'created_by' => $user?->id,
+                    'order_date' => $data['order_date'] ?? now()->toDateString(),
+                    'due_date' => $data['due_date'] ?? null,
+                    'status' => $data['status'] ?? 'draft',
+                    'gsm' => $data['gsm'],
+                    'paper_type_id' => $data['paper_type_id'],
+                    'ink_type' => $data['ink_type'],
+                    'pantone_codes' => $data['pantone_codes'] ?? null,
+                    'finish_type' => $data['finish_type'],
+                    'total_pages' => $data['total_pages'],
+                    'page_size' => $data['page_size'],
+                    'custom_width' => $data['custom_width'] ?? null,
+                    'custom_height' => $data['custom_height'] ?? null,
+                    'total_copies' => $data['total_copies'],
+                    'standard_sheet_size' => $data['standard_sheet_size'],
+                    'colors' => $data['colors'],
+                    'printing_style' => $data['printing_style'],
+                    'estimated_material_cost' => $data['estimated_material_cost'] ?? 0,
+                    'estimated_other_cost' => $data['estimated_other_cost'] ?? 0,
+                    'estimated_plate_cost' => 0,
+                    'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0),
+                    'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
+                    'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                JobCalculation::create([
+                    'job_order_id' => $order->id,
+                    'pages_per_sheet' => $calculation['pages_per_sheet'],
+                    'raw_sheets' => $calculation['raw_sheets'],
+                    'wastage_percentage' => $calculation['wastage_percentage'],
+                    'wastage_sheets' => $calculation['wastage_sheets'],
+                    'total_sheets' => $calculation['total_sheets'],
+                    'reams' => $calculation['reams'],
+                    'quires' => $calculation['quires'],
+                    'remainder_sheets' => $calculation['remainder_sheets'],
+                    'input_snapshot' => $data,
+                    'computed_at' => now(),
+                ]);
+            });
+
+            return redirect()->route('portal.page', ['page' => 'orders'])
+                ->with('success', 'Printing order created successfully.');
+        }
+        if ($module === 'quotations') {
+            $tenant = $this->tenant();
+            $user = $request->user();
+            $data = $request->validate($this->quotationRules());
+
+            $quotation = DB::transaction(function () use ($data, $tenant, $user): Quotation {
+                $subtotal = collect($data['items'])->sum(function (array $item): float {
+                    return ((float) $item['quantity']) * ((float) $item['unit_price']);
+                });
+                $profitPercentage = (float) ($data['profit_percentage'] ?? 0);
+                $profitAmount = $subtotal * ($profitPercentage / 100);
+                $discount = (float) ($data['discount'] ?? 0);
+                $tax = (float) ($data['tax'] ?? 0);
+                $total = $subtotal + $profitAmount - $discount + $tax;
+
+                $quotation = Quotation::create([
+                    'tenant_id' => $tenant->id,
+                    'customer_id' => $data['customer_id'],
+                    'quote_number' => $data['quote_number'],
+                    'inquiry_date' => $data['inquiry_date'] ?? now()->toDateString(),
+                    'valid_until' => $data['valid_until'] ?? now()->addDays(7)->toDateString(),
+                    'status' => $data['status'] ?? 'draft',
+                    'subtotal' => $subtotal,
+                    'discount' => $discount,
+                    'tax' => $tax,
+                    'profit_percentage' => $profitPercentage,
+                    'profit_amount' => $profitAmount,
+                    'total' => $total,
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $user?->id,
+                    'approved_at' => ($data['status'] ?? null) === 'approved' ? now() : null,
+                ]);
+
+                $this->syncQuotationItems($quotation, $data['items']);
+
+                return $quotation;
+            });
+
+            return redirect()->route('portal.page', ['page' => 'quotations'])
+                ->with('success', 'Quotation created successfully: ' . $quotation->quote_number);
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -78,6 +261,108 @@ class ModuleRecordController extends Controller
 
     public function update(Request $request, string $module, int $id): RedirectResponse
     {
+        if ($module === 'orders') {
+            $data = $request->validate($this->printingOrderRules());
+            $record = JobOrder::findOrFail($id);
+
+            DB::transaction(function () use ($data, $record): void {
+                $calculation = $this->printCalculationService->calculate([
+                    'total_pages' => $data['total_pages'],
+                    'page_size' => $data['page_size'],
+                    'custom_width' => $data['custom_width'] ?? null,
+                    'custom_height' => $data['custom_height'] ?? null,
+                    'total_copies' => $data['total_copies'],
+                    'standard_sheet_size' => $data['standard_sheet_size'],
+                    'colors' => $data['colors'],
+                    'wastage_per_color' => config('printing.wastage.default_per_color_percent'),
+                    'printing_style' => $data['printing_style'],
+                ]);
+
+                $record->update([
+                    'job_number' => $data['job_number'],
+                    'job_title' => $data['job_title'],
+                    'customer_id' => $data['customer_id'],
+                    'order_date' => $data['order_date'] ?? now()->toDateString(),
+                    'due_date' => $data['due_date'] ?? null,
+                    'status' => $data['status'] ?? $record->status,
+                    'gsm' => $data['gsm'],
+                    'paper_type_id' => $data['paper_type_id'],
+                    'ink_type' => $data['ink_type'],
+                    'pantone_codes' => $data['pantone_codes'] ?? null,
+                    'finish_type' => $data['finish_type'],
+                    'total_pages' => $data['total_pages'],
+                    'page_size' => $data['page_size'],
+                    'custom_width' => $data['custom_width'] ?? null,
+                    'custom_height' => $data['custom_height'] ?? null,
+                    'total_copies' => $data['total_copies'],
+                    'standard_sheet_size' => $data['standard_sheet_size'],
+                    'colors' => $data['colors'],
+                    'printing_style' => $data['printing_style'],
+                    'estimated_material_cost' => $data['estimated_material_cost'] ?? 0,
+                    'estimated_other_cost' => $data['estimated_other_cost'] ?? 0,
+                    'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0) + (float) $record->estimated_plate_cost,
+                    'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
+                    'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                JobCalculation::updateOrCreate(
+                    ['job_order_id' => $record->id],
+                    [
+                        'pages_per_sheet' => $calculation['pages_per_sheet'],
+                        'raw_sheets' => $calculation['raw_sheets'],
+                        'wastage_percentage' => $calculation['wastage_percentage'],
+                        'wastage_sheets' => $calculation['wastage_sheets'],
+                        'total_sheets' => $calculation['total_sheets'],
+                        'reams' => $calculation['reams'],
+                        'quires' => $calculation['quires'],
+                        'remainder_sheets' => $calculation['remainder_sheets'],
+                        'input_snapshot' => $data,
+                        'computed_at' => now(),
+                    ]
+                );
+            });
+
+            return redirect()->route('portal.page', ['page' => 'orders'])
+                ->with('success', 'Printing order updated successfully.');
+        }
+        if ($module === 'quotations') {
+            $data = $request->validate($this->quotationRules());
+            $quotation = Quotation::findOrFail($id);
+
+            DB::transaction(function () use ($data, $quotation): void {
+                $subtotal = collect($data['items'])->sum(function (array $item): float {
+                    return ((float) $item['quantity']) * ((float) $item['unit_price']);
+                });
+                $profitPercentage = (float) ($data['profit_percentage'] ?? 0);
+                $profitAmount = $subtotal * ($profitPercentage / 100);
+                $discount = (float) ($data['discount'] ?? 0);
+                $tax = (float) ($data['tax'] ?? 0);
+                $total = $subtotal + $profitAmount - $discount + $tax;
+
+                $quotation->update([
+                    'customer_id' => $data['customer_id'],
+                    'quote_number' => $data['quote_number'],
+                    'inquiry_date' => $data['inquiry_date'] ?? now()->toDateString(),
+                    'valid_until' => $data['valid_until'] ?? now()->addDays(7)->toDateString(),
+                    'status' => $data['status'] ?? 'draft',
+                    'subtotal' => $subtotal,
+                    'discount' => $discount,
+                    'tax' => $tax,
+                    'profit_percentage' => $profitPercentage,
+                    'profit_amount' => $profitAmount,
+                    'total' => $total,
+                    'notes' => $data['notes'] ?? null,
+                    'approved_at' => ($data['status'] ?? null) === 'approved' ? now() : null,
+                ]);
+
+                $this->syncQuotationItems($quotation, $data['items'], true);
+            });
+
+            return redirect()->route('portal.page', ['page' => 'quotations'])
+                ->with('success', 'Quotation updated successfully.');
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -98,6 +383,21 @@ class ModuleRecordController extends Controller
 
     public function destroy(string $module, int $id): RedirectResponse
     {
+        if ($module === 'orders') {
+            JobOrder::findOrFail($id)->delete();
+
+            return redirect()->route('portal.page', ['page' => 'orders'])
+                ->with('success', 'Printing order deleted successfully.');
+        }
+        if ($module === 'quotations') {
+            $quotation = Quotation::findOrFail($id);
+            $quotation->items()->delete();
+            $quotation->delete();
+
+            return redirect()->route('portal.page', ['page' => 'quotations'])
+                ->with('success', 'Quotation deleted successfully.');
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -114,8 +414,17 @@ class ModuleRecordController extends Controller
             'status' => ['required', 'string'],
         ]);
 
-        $order = Order::findOrFail($id);
-        $order->update(['status' => $data['status']]);
+        $jobOrder = JobOrder::find($id);
+        if ($jobOrder) {
+            if ($data['status'] === 'in_production') {
+                $this->enforceAdvancePaymentAndStock($jobOrder);
+            }
+
+            $jobOrder->update(['status' => $data['status']]);
+        } else {
+            $order = Order::findOrFail($id);
+            $order->update(['status' => $data['status']]);
+        }
 
         return redirect()->route('portal.page', ['page' => 'orders'])
             ->with('success', 'Order status updated successfully.');
@@ -123,6 +432,21 @@ class ModuleRecordController extends Controller
 
     public function export(string $module)
     {
+        if ($module === 'orders') {
+            $tenant = $this->tenant();
+            $rows = array_merge([['Job Number', 'Customer ID', 'Job Title', 'Order Date', 'Due Date', 'Status', 'Estimated Total']], JobOrder::where('tenant_id', $tenant->id)->get(['job_number', 'customer_id', 'job_title', 'order_date', 'due_date', 'status', 'estimated_total_price'])->map(fn ($o) => [$o->job_number, $o->customer_id, $o->job_title, $o->order_date, $o->due_date, $o->status, $o->estimated_total_price])->all());
+
+            $csv = collect($rows)->map(fn ($row) => collect($row)->map(function ($value) {
+                $value = str_replace('"', '""', (string) $value);
+                return '"' . $value . '"';
+            })->implode(','))->implode("\n");
+
+            return Response::make($csv, 200, [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="' . $module . '-export.csv"',
+            ]);
+        }
+
         $config = $this->config($module);
         abort_unless($config, 404);
 
@@ -140,6 +464,77 @@ class ModuleRecordController extends Controller
         ]);
     }
 
+    public function print(string $module, int $id)
+    {
+        $tenant = $this->tenant();
+        $payload = $this->printPayload($module, $id, $tenant->id);
+        abort_unless($payload, 404);
+
+        $pdf = Pdf::loadView($payload['view'], $payload['data']);
+
+        return $pdf->download($payload['filename'] . '.pdf');
+    }
+
+    public function printBatchQuotations(Request $request)
+    {
+        $tenant = $this->tenant();
+        if (count((array) $request->input('quotation_ids', [])) === 0) {
+            return back()->with('error', 'Please select at least one quotation to print.');
+        }
+
+        $data = $request->validate([
+            'quotation_ids' => ['required', 'array', 'min:1'],
+            'quotation_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $quotationIds = collect($data['quotation_ids'])->map(fn ($id) => (int) $id)->values();
+        $quotations = Quotation::with(['customer', 'items'])
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('id', $quotationIds->all())
+            ->orderBy('inquiry_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($quotations->count() !== $quotationIds->count()) {
+            return back()->with('error', 'Some selected quotations are invalid.');
+        }
+
+        if ($quotations->pluck('customer_id')->unique()->count() !== 1) {
+            return back()->with('error', 'Please select quotations of the same customer only.');
+        }
+
+        $customer = $quotations->first()?->customer;
+        $companyProfile = $this->companyProfileData($tenant->id);
+        $payload = [
+            'quotations' => $quotations,
+            'customer' => $customer,
+            'companyProfile' => $companyProfile,
+            'printDate' => now(),
+        ];
+
+        $pdf = Pdf::loadView('print.quotation', $payload)->setPaper('a4', 'portrait');
+
+        $filename = 'quotation-' . ($customer?->company_name ? str($customer->company_name)->slug() : 'batch') . '-' . now()->format('Ymd-His');
+
+        return $pdf->download($filename . '.pdf');
+    }
+
+    public function previewOrderCalculation(Request $request)
+    {
+        $payload = $request->validate([
+            'total_pages' => ['required', 'integer', 'min:1'],
+            'page_size' => ['required', 'string'],
+            'custom_width' => ['nullable', 'numeric', 'min:0.1'],
+            'custom_height' => ['nullable', 'numeric', 'min:0.1'],
+            'total_copies' => ['required', 'integer', 'min:1'],
+            'standard_sheet_size' => ['required', 'string', 'max:100'],
+            'colors' => ['required', 'integer', 'min:1', 'max:4'],
+            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
+        ]);
+
+        return response()->json($this->printCalculationService->calculate($payload));
+    }
+
     private function tenant(): Tenant
     {
         return Tenant::firstOrFail();
@@ -147,13 +542,20 @@ class ModuleRecordController extends Controller
 
     private function redirectPage(string $module): string
     {
-        return in_array($module, ['users', 'roles'], true) ? 'portal.page' : ($module === 'dashboard' ? 'portal.home' : 'portal.page');
+        if (in_array($module, ['users', 'roles', 'paper-types', 'ink-types', 'standard-sheets', 'units'], true)) {
+            return 'portal.page';
+        }
+
+        return $module === 'dashboard' ? 'portal.home' : 'portal.page';
     }
 
     private function redirectParams(string $module): array
     {
         if (in_array($module, ['users', 'roles'], true)) {
             return ['page' => 'users-roles'];
+        }
+        if (in_array($module, ['paper-types', 'ink-types', 'standard-sheets', 'units'], true)) {
+            return ['page' => 'settings'];
         }
 
         return $module === 'dashboard' ? [] : ['page' => $module];
@@ -175,7 +577,280 @@ class ModuleRecordController extends Controller
             'orders' => Order::where('tenant_id', $tenant->id)->pluck('order_number', 'id')->all(),
             'users' => User::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'roles' => \App\Models\Role::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
+            'paper_types' => PaperType::where(fn ($q) => $q->where('tenant_id', $tenant->id)->orWhereNull('tenant_id'))->pluck('name', 'id')->all(),
+            'ink_types' => InkType::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
+            'standard_sheets' => StandardSheet::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
+            'units' => Unit::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
         ];
+    }
+
+    private function printingOrderRules(): array
+    {
+        return [
+            'job_number' => ['required', 'string', 'max:50'],
+            'job_title' => ['required', 'string', 'max:255'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'order_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:order_date'],
+            'gsm' => ['required', 'integer', 'min:40', 'max:1000'],
+            'paper_type_id' => ['required', 'exists:paper_types,id'],
+            'ink_type' => ['required', 'string', 'max:50'],
+            'pantone_codes' => ['nullable', 'string', 'max:255'],
+            'finish_type' => ['required', 'string', 'max:50'],
+            'total_pages' => ['required', 'integer', 'min:1'],
+            'page_size' => ['required', 'string', 'max:50'],
+            'custom_width' => ['nullable', 'numeric', 'min:0.1'],
+            'custom_height' => ['nullable', 'numeric', 'min:0.1'],
+            'total_copies' => ['required', 'integer', 'min:1'],
+            'standard_sheet_size' => ['required', 'string', 'max:100'],
+            'colors' => ['required', 'integer', 'min:1', 'max:4'],
+            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
+            'estimated_material_cost' => ['nullable', 'numeric', 'min:0'],
+            'estimated_other_cost' => ['nullable', 'numeric', 'min:0'],
+            'estimated_unit_price' => ['nullable', 'numeric', 'min:0'],
+            'status' => ['nullable', 'in:draft,confirmed,in_production,quality_check,delivered'],
+            'notes' => ['nullable', 'string'],
+        ];
+    }
+
+    private function enforceAdvancePaymentAndStock(JobOrder $jobOrder): void
+    {
+        $requiredAdvance = (float) $jobOrder->estimated_total_cost * ((float) config('printing.advance_payment_percent', 50) / 100);
+        $advancePaid = (float) JobPayment::query()
+            ->where('job_order_id', $jobOrder->id)
+            ->where('payment_stage', 'advance')
+            ->sum('amount');
+
+        if ($advancePaid + 0.0001 < $requiredAdvance) {
+            abort(422, 'Cannot move to production. Minimum 50% advance payment is required.');
+        }
+
+        $calc = JobCalculation::query()->where('job_order_id', $jobOrder->id)->latest('computed_at')->first();
+        if (! $calc) {
+            abort(422, 'No print calculation found for this job.');
+        }
+
+        $stock = PaperStock::query()
+            ->where('tenant_id', $jobOrder->tenant_id)
+            ->where('paper_type_id', $jobOrder->paper_type_id)
+            ->where('gsm', $jobOrder->gsm)
+            ->where('sheet_size', $jobOrder->standard_sheet_size)
+            ->first();
+
+        if (! $stock) {
+            abort(422, 'No paper stock record found for this job.');
+        }
+
+        $availableSheets = ((int) $stock->stock_reams * 500) + ((int) $stock->stock_quires * 25) + (int) $stock->stock_sheets;
+        $requiredSheets = (int) $calc->total_sheets;
+
+        if ($availableSheets < $requiredSheets) {
+            $shortfall = $requiredSheets - $availableSheets;
+
+            JobPurchaseOrder::create([
+                'tenant_id' => $jobOrder->tenant_id,
+                'supplier_id' => Supplier::query()->where('tenant_id', $jobOrder->tenant_id)->value('id'),
+                'job_order_id' => $jobOrder->id,
+                'po_number' => 'AUTO-PO-' . now()->format('YmdHis'),
+                'order_date' => now()->toDateString(),
+                'expected_date' => now()->addDays(2)->toDateString(),
+                'status' => 'draft',
+                'is_auto_suggested' => true,
+                'subtotal' => 0,
+                'discount' => 0,
+                'tax' => 0,
+                'total' => 0,
+                'paid_amount' => 0,
+                'due_amount' => 0,
+                'notes' => 'Auto-generated for shortfall: ' . $shortfall . ' sheets',
+            ]);
+
+            abort(422, 'Insufficient paper stock. Auto PO suggestion created for shortfall.');
+        }
+
+        $remainingSheets = $availableSheets - $requiredSheets;
+        $stock->update([
+            'stock_reams' => intdiv($remainingSheets, 500),
+            'stock_quires' => intdiv($remainingSheets % 500, 25),
+            'stock_sheets' => $remainingSheets % 25,
+        ]);
+    }
+
+    private function printPayload(string $module, int $id, int $tenantId): ?array
+    {
+        $payload = match ($module) {
+            'quotations' => $this->quotationPrintPayload($id, $tenantId),
+            'orders' => $this->orderPrintPayload($id, $tenantId),
+            'invoices' => $this->invoicePrintPayload($id, $tenantId),
+            'purchases' => $this->purchasePrintPayload($id, $tenantId),
+            'deliveries' => $this->deliveryPrintPayload($id, $tenantId),
+            'customers' => $this->simplePrintPayload('print.customer', Customer::where('tenant_id', $tenantId)->findOrFail($id), 'customer-' . $id),
+            'suppliers' => $this->simplePrintPayload('print.supplier', Supplier::where('tenant_id', $tenantId)->findOrFail($id), 'supplier-' . $id),
+            'expenses' => $this->simplePrintPayload('print.expense', Expense::where('tenant_id', $tenantId)->findOrFail($id), 'expense-' . $id),
+            default => null,
+        };
+
+        if ($payload) {
+            return $payload;
+        }
+
+        $config = $this->config($module);
+        if (! $config) {
+            return null;
+        }
+
+        $record = $config['model']::query()->findOrFail($id);
+
+        return [
+            'view' => 'print.generic',
+            'data' => ['record' => $record, 'module' => $module],
+            'filename' => $module . '-' . $id,
+        ];
+    }
+
+    private function quotationPrintPayload(int $id, int $tenantId): array
+    {
+        $quotation = Quotation::with(['customer', 'items'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+        $companyProfile = $this->companyProfileData($tenantId);
+        $quotations = collect([$quotation]);
+        $customer = $quotation->customer;
+        $printDate = now();
+
+        return [
+            'view' => 'print.quotation',
+            'data' => compact('quotations', 'customer', 'companyProfile', 'printDate'),
+            'filename' => 'quotation-' . $quotation->quote_number,
+        ];
+    }
+
+    private function orderPrintPayload(int $id, int $tenantId): array
+    {
+        $order = JobOrder::with(['customer', 'paperType', 'calculations', 'payments', 'plates'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        return [
+            'view' => 'print.order',
+            'data' => compact('order'),
+            'filename' => 'job-order-' . $order->job_number,
+        ];
+    }
+
+    private function invoicePrintPayload(int $id, int $tenantId): array
+    {
+        $invoice = Invoice::with(['customer', 'order'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        return [
+            'view' => 'print.invoice',
+            'data' => compact('invoice'),
+            'filename' => 'invoice-' . $invoice->invoice_number,
+        ];
+    }
+
+    private function purchasePrintPayload(int $id, int $tenantId): array
+    {
+        $purchase = PurchaseOrder::with(['supplier', 'warehouse', 'items', 'jobOrder'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        return [
+            'view' => 'print.purchase',
+            'data' => compact('purchase'),
+            'filename' => 'purchase-' . $purchase->po_number,
+        ];
+    }
+
+    private function deliveryPrintPayload(int $id, int $tenantId): array
+    {
+        $delivery = Delivery::with(['order.customer'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        return [
+            'view' => 'print.delivery',
+            'data' => compact('delivery'),
+            'filename' => 'delivery-' . $delivery->delivery_number,
+        ];
+    }
+
+    private function simplePrintPayload(string $view, mixed $record, string $filename): array
+    {
+        return [
+            'view' => $view,
+            'data' => ['record' => $record],
+            'filename' => $filename,
+        ];
+    }
+
+    private function companyProfileData(int $tenantId): array
+    {
+        $tenant = Tenant::query()->findOrFail($tenantId);
+        $companyProfile = (array) optional(
+            Setting::query()
+                ->where('tenant_id', $tenantId)
+                ->where('key', 'company_profile')
+                ->first()
+        )->value_json;
+
+        return [
+            'company_name' => $companyProfile['company_name'] ?? $tenant->name,
+            'tagline' => $companyProfile['tagline'] ?? null,
+            'address' => $companyProfile['address'] ?? $tenant->address,
+            'phone' => $companyProfile['phone'] ?? $tenant->phone,
+            'email' => $companyProfile['email'] ?? $tenant->email,
+            'website' => $companyProfile['website'] ?? null,
+            'vat_no' => $companyProfile['vat_no'] ?? null,
+            'bin_no' => $companyProfile['bin_no'] ?? null,
+            'trade_license_no' => $companyProfile['trade_license_no'] ?? null,
+            'logo_url' => $companyProfile['logo_url'] ?? $tenant->logo,
+            'signature_name' => $companyProfile['signature_name'] ?? null,
+            'signature_title' => $companyProfile['signature_title'] ?? null,
+            'quotation_footer_note' => $companyProfile['quotation_footer_note'] ?? 'Note: This Quotation Is Excluding Vat & Tax.',
+        ];
+    }
+
+    private function quotationRules(): array
+    {
+        return [
+            'quote_number' => ['required', 'string', 'max:255'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'inquiry_date' => ['nullable', 'date'],
+            'valid_until' => ['nullable', 'date'],
+            'status' => ['required', 'in:draft,sent,approved'],
+            'discount' => ['nullable', 'numeric', 'min:0'],
+            'tax' => ['nullable', 'numeric', 'min:0'],
+            'profit_percentage' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_name' => ['required', 'string', 'max:255'],
+            'items.*.description' => ['nullable', 'string'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    private function syncQuotationItems(Quotation $quotation, array $items, bool $replace = false): void
+    {
+        if ($replace) {
+            $quotation->items()->delete();
+        }
+
+        foreach ($items as $item) {
+            QuotationItem::create([
+                'tenant_id' => $quotation->tenant_id,
+                'quotation_id' => $quotation->id,
+                'item_name' => $item['item_name'],
+                'description' => $item['description'] ?? null,
+                'quantity' => (float) $item['quantity'],
+                'unit_price' => (float) $item['unit_price'],
+                'total_price' => ((float) $item['quantity']) * ((float) $item['unit_price']),
+                'specification_json' => null,
+            ]);
+        }
     }
 
     private function config(string $module): ?array
@@ -301,6 +976,88 @@ class ModuleRecordController extends Controller
                 ],
                 'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id]),
                 'export' => fn ($tenant) => array_merge([['Code', 'Name', 'Manager', 'Address', 'Status']], Warehouse::where('tenant_id', $tenant->id)->get(['code', 'name', 'manager_name', 'address', 'status'])->map(fn ($w) => [$w->code, $w->name, $w->manager_name, $w->address, $w->status])->all()),
+            ],
+            'paper-types' => [
+                'title' => 'Add Paper Type',
+                'model' => PaperType::class,
+                'success' => 'Paper type created successfully.',
+                'fields' => [
+                    ['name' => 'name', 'label' => 'Paper Type Name', 'type' => 'text'],
+                    ['name' => 'code', 'label' => 'Code', 'type' => 'text'],
+                    ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
+                    ['name' => 'notes', 'label' => 'Notes', 'type' => 'text'],
+                ],
+                'rules' => [
+                    'name' => ['required', 'string', 'max:255'],
+                    'code' => ['nullable', 'string', 'max:100'],
+                    'status' => ['required', 'string', 'max:50'],
+                    'notes' => ['nullable', 'string'],
+                ],
+                'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id]),
+                'export' => fn ($tenant) => array_merge([['Name', 'Code', 'Status', 'Notes']], PaperType::where(fn ($q) => $q->where('tenant_id', $tenant->id)->orWhereNull('tenant_id'))->get(['name', 'code', 'status', 'notes'])->map(fn ($p) => [$p->name, $p->code, $p->status, $p->notes])->all()),
+            ],
+            'ink-types' => [
+                'title' => 'Add Ink Type',
+                'model' => InkType::class,
+                'success' => 'Ink type created successfully.',
+                'fields' => [
+                    ['name' => 'name', 'label' => 'Ink Name', 'type' => 'text'],
+                    ['name' => 'code', 'label' => 'Code', 'type' => 'text'],
+                    ['name' => 'pantone_code', 'label' => 'Pantone Code', 'type' => 'text'],
+                    ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
+                    ['name' => 'notes', 'label' => 'Notes', 'type' => 'text'],
+                ],
+                'rules' => [
+                    'name' => ['required', 'string', 'max:255'],
+                    'code' => ['nullable', 'string', 'max:100'],
+                    'pantone_code' => ['nullable', 'string', 'max:100'],
+                    'status' => ['required', 'string', 'max:50'],
+                    'notes' => ['nullable', 'string'],
+                ],
+                'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id]),
+                'export' => fn ($tenant) => array_merge([['Name', 'Code', 'Pantone', 'Status', 'Notes']], InkType::where('tenant_id', $tenant->id)->get(['name', 'code', 'pantone_code', 'status', 'notes'])->map(fn ($i) => [$i->name, $i->code, $i->pantone_code, $i->status, $i->notes])->all()),
+            ],
+            'standard-sheets' => [
+                'title' => 'Add Standard Sheet Unit',
+                'model' => StandardSheet::class,
+                'success' => 'Standard sheet saved successfully.',
+                'fields' => [
+                    ['name' => 'name', 'label' => 'Sheet Name', 'type' => 'text'],
+                    ['name' => 'code', 'label' => 'Code', 'type' => 'text'],
+                    ['name' => 'width_in', 'label' => 'Width (inch)', 'type' => 'number'],
+                    ['name' => 'height_in', 'label' => 'Height (inch)', 'type' => 'number'],
+                    ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
+                ],
+                'rules' => [
+                    'name' => ['required', 'string', 'max:255'],
+                    'code' => ['required', 'string', 'max:100'],
+                    'width_in' => ['required', 'numeric', 'min:0.1'],
+                    'height_in' => ['required', 'numeric', 'min:0.1'],
+                    'status' => ['required', 'string', 'max:50'],
+                ],
+                'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id]),
+                'export' => fn ($tenant) => array_merge([['Name', 'Code', 'Width', 'Height', 'Status']], StandardSheet::where('tenant_id', $tenant->id)->get(['name', 'code', 'width_in', 'height_in', 'status'])->map(fn ($s) => [$s->name, $s->code, $s->width_in, $s->height_in, $s->status])->all()),
+            ],
+            'units' => [
+                'title' => 'Add Unit',
+                'model' => Unit::class,
+                'success' => 'Unit created successfully.',
+                'fields' => [
+                    ['name' => 'name', 'label' => 'Unit Name', 'type' => 'text'],
+                    ['name' => 'symbol', 'label' => 'Symbol', 'type' => 'text'],
+                    ['name' => 'category', 'label' => 'Category', 'type' => 'text'],
+                    ['name' => 'base_quantity', 'label' => 'Base Quantity', 'type' => 'number'],
+                    ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
+                ],
+                'rules' => [
+                    'name' => ['required', 'string', 'max:255'],
+                    'symbol' => ['nullable', 'string', 'max:30'],
+                    'category' => ['nullable', 'string', 'max:100'],
+                    'base_quantity' => ['nullable', 'numeric', 'min:0.0001'],
+                    'status' => ['required', 'string', 'max:50'],
+                ],
+                'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id, 'base_quantity' => $data['base_quantity'] ?? 1]),
+                'export' => fn ($tenant) => array_merge([['Name', 'Symbol', 'Category', 'Base Quantity', 'Status']], Unit::where('tenant_id', $tenant->id)->get(['name', 'symbol', 'category', 'base_quantity', 'status'])->map(fn ($u) => [$u->name, $u->symbol, $u->category, $u->base_quantity, $u->status])->all()),
             ],
             'quotations' => [
                 'title' => 'Create Quotation',

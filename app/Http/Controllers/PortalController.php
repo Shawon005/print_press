@@ -7,19 +7,25 @@ use App\Models\Delivery;
 use App\Models\Employee;
 use App\Models\Expense;
 use App\Models\Invoice;
+use App\Models\InkType;
+use App\Models\JobOrder;
 use App\Models\Order as PrintOrder;
+use App\Models\PaperType;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\RawMaterial;
 use App\Models\Role;
 use App\Models\Setting;
+use App\Models\StandardSheet;
 use App\Models\SubscriptionPlan;
 use App\Models\Supplier;
 use App\Models\Tenant;
+use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class PortalController extends Controller
@@ -36,9 +42,82 @@ class PortalController extends Controller
         return $this->renderPage($page);
     }
 
+    public function updateCompanyProfile(Request $request): RedirectResponse
+    {
+        $tenant = Tenant::firstOrFail();
+
+        $data = $request->validate([
+            'company_name' => ['required', 'string', 'max:255'],
+            'tagline' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'website' => ['nullable', 'string', 'max:255'],
+            'vat_no' => ['nullable', 'string', 'max:100'],
+            'bin_no' => ['nullable', 'string', 'max:100'],
+            'trade_license_no' => ['nullable', 'string', 'max:100'],
+            'logo_url' => ['nullable', 'string', 'max:1000'],
+            'signature_name' => ['nullable', 'string', 'max:255'],
+            'signature_title' => ['nullable', 'string', 'max:255'],
+            'quotation_footer_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        Setting::updateOrCreate(
+            [
+                'tenant_id' => $tenant->id,
+                'key' => 'company_profile',
+            ],
+            [
+                'value_json' => $data,
+            ]
+        );
+
+        $tenant->update([
+            'name' => $data['company_name'],
+            'email' => $data['email'] ?? $tenant->email,
+            'phone' => $data['phone'] ?? $tenant->phone,
+            'address' => $data['address'] ?? $tenant->address,
+            'logo' => $data['logo_url'] ?? $tenant->logo,
+        ]);
+
+        return redirect()->route('portal.page', ['page' => 'settings'])
+            ->with('success', 'Company profile updated successfully.');
+    }
+
+    public function companyProfile(): View
+    {
+        $tenant = Tenant::with('plan')->firstOrFail();
+        $companyProfile = (array) optional(
+            Setting::where('tenant_id', $tenant->id)->where('key', 'company_profile')->first()
+        )->value_json;
+
+        return view('company-profile', [
+            'companyProfile' => [
+                'company_name' => $companyProfile['company_name'] ?? $tenant->name,
+                'tagline' => $companyProfile['tagline'] ?? null,
+                'address' => $companyProfile['address'] ?? $tenant->address,
+                'phone' => $companyProfile['phone'] ?? $tenant->phone,
+                'email' => $companyProfile['email'] ?? $tenant->email,
+                'website' => $companyProfile['website'] ?? null,
+                'vat_no' => $companyProfile['vat_no'] ?? null,
+                'bin_no' => $companyProfile['bin_no'] ?? null,
+                'trade_license_no' => $companyProfile['trade_license_no'] ?? null,
+                'logo_url' => $companyProfile['logo_url'] ?? $tenant->logo,
+                'signature_name' => $companyProfile['signature_name'] ?? null,
+                'signature_title' => $companyProfile['signature_title'] ?? null,
+                'quotation_footer_note' => $companyProfile['quotation_footer_note'] ?? null,
+            ],
+        ]);
+    }
+
     private function renderPage(string $page): View
     {
         $tenant = Tenant::with('plan')->firstOrFail();
+        $companyProfile = (array) optional(
+            Setting::where('tenant_id', $tenant->id)->where('key', 'company_profile')->first()
+        )->value_json;
+        $companyName = $companyProfile['company_name'] ?? $tenant->name;
+        $primaryUser = User::where('tenant_id', $tenant->id)->first();
         $pages = $this->pages();
         $pageData = array_merge($this->pageData($page, $tenant), $this->pageActions($page));
 
@@ -48,9 +127,13 @@ class PortalController extends Controller
             'pageMeta' => $pages[$page],
             'pageData' => $pageData,
             'workspace' => [
-                'name' => $tenant->name,
+                'name' => $companyName,
+                'company_name' => $companyName,
+                'company_tagline' => $companyProfile['tagline'] ?? null,
+                'company_logo' => $companyProfile['logo_url'] ?? $tenant->logo,
+                'company_profile_url' => route('company-profile.edit'),
                 'role' => 'Tenant Owner',
-                'user' => User::where('tenant_id', $tenant->id)->first()?->name ?? 'Workspace User',
+                'user' => $primaryUser?->name ?? 'Workspace User',
                 'status' => $tenant->is_active ? 'Workspace Active' : 'Workspace Inactive',
             ],
         ]);
@@ -110,16 +193,16 @@ class PortalController extends Controller
                 : match ($page) {
                     'dashboard' => ['label' => 'Create Quotation', 'url' => route('modules.create', 'quotations')],
                     'reports' => ['label' => 'Open Orders', 'url' => route('portal.page', 'orders')],
-                    'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
-                    'settings' => ['label' => 'Open Subscription', 'url' => route('portal.page', 'subscription')],
-                    'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
-                    default => null,
-                },
+                'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
+                'settings' => ['label' => 'Add Paper Type', 'url' => route('modules.create', 'paper-types')],
+                'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
+                default => null,
+            },
             'secondary_action' => match ($page) {
                 'dashboard' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
                 'reports' => ['label' => 'Export Reports', 'url' => route('modules.export', 'invoices')],
                 'users-roles' => ['label' => 'Add Role', 'url' => route('modules.create', 'roles')],
-                'settings' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
+                'settings' => ['label' => 'Add Ink Type', 'url' => route('modules.create', 'ink-types')],
                 'subscription' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
                 default => ['label' => 'Export ' . str($page)->headline(), 'url' => route('modules.export', $page)],
             },
@@ -404,33 +487,33 @@ class PortalController extends Controller
 
     private function ordersData(Tenant $tenant): array
     {
-        $orders = PrintOrder::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+        $orders = JobOrder::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
 
         return [
             'eyebrow' => 'Order Management',
             'headline' => 'Turn approved quotes into tracked print jobs with statuses, managers, and expected delivery.',
-            'description' => 'Orders are linked to customers, quotations, items, job stages, invoices, and deliveries inside the database.',
+            'description' => 'Orders now use the printing-specific job order engine (GSM, paper specs, calculations, advance gate, and production statuses).',
             'actions' => ['Create Order', 'Assign Manager'],
             'stats' => [
                 ['label' => 'Open Jobs', 'value' => (string) $orders->count(), 'note' => 'total orders in workspace'],
-                ['label' => 'In Production', 'value' => (string) $orders->where('status', 'printing')->count(), 'note' => 'currently on production floor'],
-                ['label' => 'Due This Week', 'value' => (string) $orders->filter(fn (PrintOrder $order) => optional($order->expected_delivery_date)?->isCurrentWeek())->count(), 'note' => 'delivery horizon'],
-                ['label' => 'Receivable', 'value' => '$' . number_format((float) $orders->sum('due_amount'), 0), 'note' => 'order-level due amount'],
+                ['label' => 'In Production', 'value' => (string) $orders->where('status', 'in_production')->count(), 'note' => 'currently on production floor'],
+                ['label' => 'Due This Week', 'value' => (string) $orders->filter(fn (JobOrder $order) => optional($order->due_date)?->isCurrentWeek())->count(), 'note' => 'delivery horizon'],
+                ['label' => 'Receivable', 'value' => '$' . number_format((float) $orders->sum('estimated_total_price'), 0), 'note' => 'estimated job receivable'],
             ],
             'table' => [
                 'title' => 'Order board',
                 'columns' => ['Order No', 'Customer', 'Job Title', 'Order Date', 'Expected Delivery', 'Status'],
-                'rows' => $orders->map(fn (PrintOrder $order) => [
-                    $order->order_number,
+                'rows' => $orders->map(fn (JobOrder $order) => [
+                    $order->job_number,
                     $order->customer?->company_name ?? '-',
                     $order->job_title,
                     optional($order->order_date)->format('M d, Y'),
-                    optional($order->expected_delivery_date)->format('M d, Y'),
+                    optional($order->due_date)->format('M d, Y'),
                     str($order->status)->headline()->toString(),
                 ])->all(),
                 'record_ids' => $orders->pluck('id')->all(),
                 'status_values' => $orders->pluck('status')->all(),
-                'status_options' => ['pending', 'approval', 'printing', 'finishing', 'delivered', 'cancelled'],
+                'status_options' => ['draft', 'confirmed', 'in_production', 'quality_check', 'delivered'],
             ],
             'side_panel' => [
                 'title' => 'Production stages',
@@ -663,33 +746,184 @@ class PortalController extends Controller
     private function settingsData(Tenant $tenant): array
     {
         $settings = Setting::where('tenant_id', $tenant->id)->get();
+        $companyProfile = (array) optional(
+            Setting::where('tenant_id', $tenant->id)->where('key', 'company_profile')->first()
+        )->value_json;
+        $paperTypes = PaperType::where(fn ($q) => $q->where('tenant_id', $tenant->id)->orWhereNull('tenant_id'))->get();
+        $inkTypes = InkType::where('tenant_id', $tenant->id)->get();
+        $standardSheets = StandardSheet::where('tenant_id', $tenant->id)->get();
+        $units = Unit::where('tenant_id', $tenant->id)->get();
+
+        $masterRows = collect();
+        foreach ($paperTypes as $paperType) {
+            $masterRows->push([
+                'module' => 'paper-types',
+                'id' => $paperType->id,
+                'type' => 'Paper Type',
+                'name' => $paperType->name,
+                'code' => $paperType->code,
+                'extra' => $paperType->notes,
+                'status' => $paperType->status,
+                'updated_at' => $paperType->updated_at,
+            ]);
+        }
+        foreach ($inkTypes as $inkType) {
+            $masterRows->push([
+                'module' => 'ink-types',
+                'id' => $inkType->id,
+                'type' => 'Ink Type',
+                'name' => $inkType->name,
+                'code' => $inkType->code,
+                'extra' => $inkType->pantone_code,
+                'status' => $inkType->status,
+                'updated_at' => $inkType->updated_at,
+            ]);
+        }
+        foreach ($standardSheets as $standardSheet) {
+            $masterRows->push([
+                'module' => 'standard-sheets',
+                'id' => $standardSheet->id,
+                'type' => 'Standard Sheet',
+                'name' => $standardSheet->name,
+                'code' => $standardSheet->code,
+                'extra' => $standardSheet->width_in . ' x ' . $standardSheet->height_in . ' in',
+                'status' => $standardSheet->status,
+                'updated_at' => $standardSheet->updated_at,
+            ]);
+        }
+        foreach ($units as $unit) {
+            $masterRows->push([
+                'module' => 'units',
+                'id' => $unit->id,
+                'type' => 'Unit',
+                'name' => $unit->name,
+                'code' => $unit->symbol,
+                'extra' => $unit->category . ' / ' . $unit->base_quantity,
+                'status' => $unit->status,
+                'updated_at' => $unit->updated_at,
+            ]);
+        }
+
+        $settingsTabs = [
+            [
+                'key' => 'paper-types',
+                'label' => 'Paper Types',
+                'create_url' => route('modules.create', 'paper-types'),
+                'columns' => ['Name', 'Code', 'Notes', 'Updated', 'Status'],
+                'rows' => $paperTypes->map(fn (PaperType $paperType) => [
+                    'record_id' => $paperType->id,
+                    'module' => 'paper-types',
+                    'cells' => [
+                        $paperType->name,
+                        $paperType->code,
+                        $paperType->notes,
+                        optional($paperType->updated_at)->format('M d, Y'),
+                        str($paperType->status)->headline()->toString(),
+                    ],
+                ])->values()->all(),
+            ],
+            [
+                'key' => 'ink-types',
+                'label' => 'Ink Types',
+                'create_url' => route('modules.create', 'ink-types'),
+                'columns' => ['Name', 'Code', 'Pantone', 'Updated', 'Status'],
+                'rows' => $inkTypes->map(fn (InkType $inkType) => [
+                    'record_id' => $inkType->id,
+                    'module' => 'ink-types',
+                    'cells' => [
+                        $inkType->name,
+                        $inkType->code,
+                        $inkType->pantone_code,
+                        optional($inkType->updated_at)->format('M d, Y'),
+                        str($inkType->status)->headline()->toString(),
+                    ],
+                ])->values()->all(),
+            ],
+            [
+                'key' => 'standard-sheets',
+                'label' => 'Standard Sheets',
+                'create_url' => route('modules.create', 'standard-sheets'),
+                'columns' => ['Name', 'Code', 'Size (inch)', 'Updated', 'Status'],
+                'rows' => $standardSheets->map(fn (StandardSheet $sheet) => [
+                    'record_id' => $sheet->id,
+                    'module' => 'standard-sheets',
+                    'cells' => [
+                        $sheet->name,
+                        $sheet->code,
+                        $sheet->width_in . ' x ' . $sheet->height_in,
+                        optional($sheet->updated_at)->format('M d, Y'),
+                        str($sheet->status)->headline()->toString(),
+                    ],
+                ])->values()->all(),
+            ],
+            [
+                'key' => 'units',
+                'label' => 'Units',
+                'create_url' => route('modules.create', 'units'),
+                'columns' => ['Name', 'Symbol', 'Category', 'Base Qty', 'Status'],
+                'rows' => $units->map(fn (Unit $unit) => [
+                    'record_id' => $unit->id,
+                    'module' => 'units',
+                    'cells' => [
+                        $unit->name,
+                        $unit->symbol,
+                        $unit->category,
+                        (string) $unit->base_quantity,
+                        str($unit->status)->headline()->toString(),
+                    ],
+                ])->values()->all(),
+            ],
+        ];
 
         return [
             'eyebrow' => 'Workspace Settings',
-            'headline' => 'Configure tenant profile, branches, tax rules, numbering, and operational preferences.',
-            'description' => 'Business profile and document series are now stored per tenant in the settings table.',
+            'headline' => 'Configure tenant profile, branches, tax rules, numbering, and master print settings.',
+            'description' => 'Paper Types, Ink Types, Standard Sheets, and Units are managed here with full CRUD.',
             'actions' => ['Save Settings', 'Preview Branding'],
             'stats' => [
                 ['label' => 'Setting Groups', 'value' => (string) $settings->count(), 'note' => 'saved tenant settings'],
                 ['label' => 'Branches', 'value' => (string) Warehouse::where('tenant_id', $tenant->id)->count(), 'note' => 'configured operational locations'],
                 ['label' => 'Users', 'value' => (string) User::where('tenant_id', $tenant->id)->count(), 'note' => 'workspace staff count'],
-                ['label' => 'Current Plan', 'value' => $tenant->plan?->name ?? 'N/A', 'note' => 'linked subscription plan'],
+                ['label' => 'Master Records', 'value' => (string) $masterRows->count(), 'note' => 'paper/ink/sheet/unit entries'],
             ],
             'table' => [
-                'title' => 'Configuration groups',
-                'columns' => ['Key', 'Summary', 'Scope', 'Tenant', 'Updated', 'Status'],
-                'rows' => $settings->map(fn (Setting $setting) => [
-                    $setting->key,
-                    implode(', ', array_keys($setting->value_json ?? [])),
-                    'Tenant',
-                    $tenant->name,
-                    optional($setting->updated_at)->format('M d, Y'),
-                    'Configured',
-                ])->all(),
+                'title' => 'Print Master Settings',
+                'columns' => ['Type', 'Name', 'Code', 'Details', 'Updated', 'Status'],
+                'rows' => $masterRows->sortByDesc('updated_at')->map(fn (array $row) => [
+                    $row['type'],
+                    $row['name'],
+                    $row['code'],
+                    $row['extra'],
+                    optional($row['updated_at'])->format('M d, Y'),
+                    str($row['status'] ?? 'active')->headline()->toString(),
+                ])->values()->all(),
+                'record_ids' => $masterRows->sortByDesc('updated_at')->pluck('id')->values()->all(),
+                'module_map' => $masterRows->sortByDesc('updated_at')->pluck('module')->values()->all(),
+            ],
+            'settings_tabs' => $settingsTabs,
+            'company_profile' => [
+                'company_name' => $companyProfile['company_name'] ?? $tenant->name,
+                'tagline' => $companyProfile['tagline'] ?? null,
+                'address' => $companyProfile['address'] ?? $tenant->address,
+                'phone' => $companyProfile['phone'] ?? $tenant->phone,
+                'email' => $companyProfile['email'] ?? $tenant->email,
+                'website' => $companyProfile['website'] ?? null,
+                'vat_no' => $companyProfile['vat_no'] ?? null,
+                'bin_no' => $companyProfile['bin_no'] ?? null,
+                'trade_license_no' => $companyProfile['trade_license_no'] ?? null,
+                'logo_url' => $companyProfile['logo_url'] ?? $tenant->logo,
+                'signature_name' => $companyProfile['signature_name'] ?? null,
+                'signature_title' => $companyProfile['signature_title'] ?? null,
+                'quotation_footer_note' => $companyProfile['quotation_footer_note'] ?? null,
             ],
             'side_panel' => [
-                'title' => 'Settings areas',
-                'items' => ['Business profile', 'Branding', 'Tax setup', 'Document numbering', 'Approval rules', 'Branch preferences'],
+                'title' => 'Master CRUD Shortcuts',
+                'items' => [
+                    'Add Paper Type: ' . route('modules.create', 'paper-types'),
+                    'Add Ink Type: ' . route('modules.create', 'ink-types'),
+                    'Add Standard Sheet: ' . route('modules.create', 'standard-sheets'),
+                    'Add Unit: ' . route('modules.create', 'units'),
+                ],
             ],
         ];
     }

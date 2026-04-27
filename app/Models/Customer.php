@@ -21,9 +21,19 @@ class Customer extends Model
         'billing_address',
         'delivery_address',
         'city',
+        'outstanding_balance',
+        'last_trade_at',
         'notes',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'outstanding_balance' => 'decimal:2',
+            'last_trade_at' => 'date',
+        ];
+    }
 
     public function interactions(): HasMany
     {
@@ -38,5 +48,10 @@ class Customer extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function jobOrders(): HasMany
+    {
+        return $this->hasMany(JobOrder::class);
     }
 }

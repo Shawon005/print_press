@@ -21,6 +21,8 @@ class Quotation extends Model
         'subtotal',
         'discount',
         'tax',
+        'profit_percentage',
+        'profit_amount',
         'total',
         'notes',
         'created_by',
@@ -34,6 +36,8 @@ class Quotation extends Model
             'inquiry_date' => 'date',
             'valid_until' => 'date',
             'approved_at' => 'datetime',
+            'profit_percentage' => 'decimal:2',
+            'profit_amount' => 'decimal:2',
         ];
     }
 
