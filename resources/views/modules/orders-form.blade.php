@@ -19,14 +19,14 @@
                     <a href="{{ route('portal.page', 'orders') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Back to Orders</a>
                 </div>
 
-                <div class="surface-card p-6 md:p-8">
-                    <div class="mb-5 flex flex-wrap gap-2 text-xs font-semibold">
+                <div class="surface-card p-6 md:p-8 ">
+                    <div class="mb-4 flex flex-wrap gap-2 text-xs font-semibold">
                         <template x-for="(s, idx) in steps" :key="idx">
                             <button type="button" class="rounded-full px-3 py-1" :class="step === (idx + 1) ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'" @click="step = idx + 1" x-text="(idx + 1) + '. ' + s"></button>
                         </template>
                     </div>
 
-                    <form method="POST" action="{{ $formAction }}" class="space-y-6" @input.debounce.500ms="preview()">
+                    <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="space-y-6" @input.debounce.500ms="preview()">
                         @csrf
                         @if ($formMethod !== 'POST') @method($formMethod) @endif
 
@@ -38,7 +38,6 @@
                             <div><label class="mb-2 block text-sm font-semibold">Due Date</label><input type="date" name="due_date" value="{{ old('due_date', optional($record?->due_date)->toDateString()) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
                             <div><label class="mb-2 block text-sm font-semibold">Status</label><select name="status" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="draft" @selected(old('status', $record?->status) === 'draft')>Draft</option><option value="confirmed" @selected(old('status', $record?->status) === 'confirmed')>Confirmed</option><option value="quality_check" @selected(old('status', $record?->status) === 'quality_check')>Quality Check</option><option value="delivered" @selected(old('status', $record?->status) === 'delivered')>Delivered</option></select></div>
                         </div>
-
                         <div x-show="step===2" class="grid gap-5 md:grid-cols-3">
                             <div><label class="mb-2 block text-sm font-semibold">Paper Type</label><select x-model="form.paper_type_id" name="paper_type_id" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required><option value="">Select</option>@foreach($paperTypes as $paperType)<option value="{{ $paperType->id }}" @selected(old('paper_type_id', $record?->paper_type_id) == $paperType->id)>{{ $paperType->name }}</option>@endforeach</select></div>
                             <div><label class="mb-2 block text-sm font-semibold">GSM</label><input type="number" x-model="form.gsm" name="gsm" value="{{ old('gsm', $record?->gsm) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required></div>
@@ -89,6 +88,20 @@
                             <div><label class="mb-2 block text-sm font-semibold">Estimated Material Cost</label><input type="number" step="0.01" name="estimated_material_cost" value="{{ old('estimated_material_cost', $record?->estimated_material_cost ?? 0) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
                             <div><label class="mb-2 block text-sm font-semibold">Estimated Other Cost</label><input type="number" step="0.01" name="estimated_other_cost" value="{{ old('estimated_other_cost', $record?->estimated_other_cost ?? 0) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
                             <div><label class="mb-2 block text-sm font-semibold">Estimated Unit Price</label><input type="number" step="0.01" name="estimated_unit_price" value="{{ old('estimated_unit_price', $record?->estimated_unit_price ?? 0) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold">Design Source</label>
+                                <select name="design_source" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                                    <option value="customer_provided" @selected(old('design_source', $record?->design_source ?? 'customer_provided') === 'customer_provided')>Customer Provided</option>
+                                    <option value="in_house" @selected(old('design_source', $record?->design_source ?? 'customer_provided') === 'in_house')>In House</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-2 block text-sm font-semibold">Design File (Image/PDF)</label>
+                                <input type="file" name="design_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                                @if ($record?->design_file_path)
+                                    <p class="mt-2 text-xs text-slate-500">Current file: <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($record->design_file_path) }}" target="_blank" class="font-semibold text-[var(--brand)] hover:underline">{{ $record->design_file_name ?: 'View uploaded design' }}</a></p>
+                                @endif
+                            </div>
                             <div class="md:col-span-3"><label class="mb-2 block text-sm font-semibold">Notes</label><textarea name="notes" rows="3" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm">{{ old('notes', $record?->notes) }}</textarea></div>
                         </div>
 

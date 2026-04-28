@@ -16,6 +16,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/settings/company-profile', [PortalController::class, 'updateCompanyProfile'])->name('settings.company-profile.update');
 
     Route::get('/modules/{module}/create', [ModuleRecordController::class, 'create'])->name('modules.create');
+    Route::get('/modules/{module}/{id}', [ModuleRecordController::class, 'show'])->name('modules.show');
     Route::get('/modules/{module}/{id}/edit', [ModuleRecordController::class, 'edit'])->name('modules.edit');
     Route::get('/modules/{module}/{id}/print', [ModuleRecordController::class, 'print'])->name('modules.print');
     Route::post('/quotations/print-batch', [ModuleRecordController::class, 'printBatchQuotations'])->name('quotations.print-batch');
@@ -24,6 +25,7 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/modules/{module}/{id}', [ModuleRecordController::class, 'destroy'])->name('modules.destroy');
     Route::patch('/orders/{id}/status', [ModuleRecordController::class, 'updateOrderStatus'])->name('orders.status');
     Route::post('/orders/calc-preview', [ModuleRecordController::class, 'previewOrderCalculation'])->name('orders.calc-preview');
+    Route::get('/invoices/job-orders/{id}/summary', [ModuleRecordController::class, 'invoiceJobOrderSummary'])->name('invoices.job-orders.summary');
     Route::get('/modules/{module}/export', [ModuleRecordController::class, 'export'])->name('modules.export');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');

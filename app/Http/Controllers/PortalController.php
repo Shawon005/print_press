@@ -27,19 +27,20 @@ use App\Models\Warehouse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class PortalController extends Controller
 {
-    public function home(): View
+    public function home(Request $request): View
     {
-        return $this->renderPage('dashboard');
+        return $this->renderPage('dashboard', $request);
     }
 
     public function show(Request $request, string $page): View
     {
         abort_unless(array_key_exists($page, $this->pages()), 404);
 
-        return $this->renderPage($page);
+        return $this->renderPage($page, $request);
     }
 
     public function updateCompanyProfile(Request $request): RedirectResponse
@@ -110,7 +111,7 @@ class PortalController extends Controller
         ]);
     }
 
-    private function renderPage(string $page): View
+    private function renderPage(string $page, ?Request $request = null): View
     {
         $tenant = Tenant::with('plan')->firstOrFail();
         $companyProfile = (array) optional(
@@ -119,7 +120,7 @@ class PortalController extends Controller
         $companyName = $companyProfile['company_name'] ?? $tenant->name;
         $primaryUser = User::where('tenant_id', $tenant->id)->first();
         $pages = $this->pages();
-        $pageData = array_merge($this->pageData($page, $tenant), $this->pageActions($page));
+        $pageData = array_merge($this->pageData($page, $tenant, $request), $this->pageActions($page));
 
         return view('portal', [
             'pages' => $pages,
@@ -155,13 +156,14 @@ class PortalController extends Controller
             'expenses' => ['label' => 'Expenses', 'title' => 'Operating cost control', 'icon' => 'wallet'],
             'deliveries' => ['label' => 'Deliveries', 'title' => 'Dispatch, routes, and proof of delivery', 'icon' => 'truck'],
             'reports' => ['label' => 'Reports', 'title' => 'Analytics, due reports, and profitability', 'icon' => 'chart'],
+            'printing' => ['label' => 'Printing', 'title' => 'Sheet layout and orientation calculator', 'icon' => 'printer'],
             'users-roles' => ['label' => 'Users & Roles', 'title' => 'Tenant access and permissions', 'icon' => 'shield'],
             'settings' => ['label' => 'Settings', 'title' => 'Tenant configuration and business profile', 'icon' => 'settings'],
             'subscription' => ['label' => 'Subscription', 'title' => 'Plans, usage, and billing', 'icon' => 'spark'],
         ];
     }
 
-    private function pageData(string $page, Tenant $tenant): array
+    private function pageData(string $page, Tenant $tenant, ?Request $request = null): array
     {
         return match ($page) {
             'dashboard' => $this->dashboardData($tenant),
@@ -176,7 +178,8 @@ class PortalController extends Controller
             'invoices' => $this->invoicesData($tenant),
             'expenses' => $this->expensesData($tenant),
             'deliveries' => $this->deliveriesData($tenant),
-            'reports' => $this->reportsData($tenant),
+            'reports' => $this->reportsData($tenant, $request),
+            'printing' => $this->printingData($request),
             'users-roles' => $this->usersRolesData($tenant),
             'settings' => $this->settingsData($tenant),
             'subscription' => $this->subscriptionData($tenant),
@@ -193,28 +196,109 @@ class PortalController extends Controller
                 : match ($page) {
                     'dashboard' => ['label' => 'Create Quotation', 'url' => route('modules.create', 'quotations')],
                     'reports' => ['label' => 'Open Orders', 'url' => route('portal.page', 'orders')],
-                'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
-                'settings' => ['label' => 'Add Paper Type', 'url' => route('modules.create', 'paper-types')],
-                'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
-                default => null,
-            },
+                    'printing' => ['label' => 'Open Settings', 'url' => route('portal.page', 'settings')],
+                    'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
+                    'settings' => ['label' => 'Add Paper Type', 'url' => route('modules.create', 'paper-types')],
+                    'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
+                    default => null,
+                },
             'secondary_action' => match ($page) {
                 'dashboard' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
                 'reports' => ['label' => 'Export Reports', 'url' => route('modules.export', 'invoices')],
+                'printing' => null,
                 'users-roles' => ['label' => 'Add Role', 'url' => route('modules.create', 'roles')],
                 'settings' => ['label' => 'Add Ink Type', 'url' => route('modules.create', 'ink-types')],
                 'subscription' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
                 default => ['label' => 'Export ' . str($page)->headline(), 'url' => route('modules.export', $page)],
             },
-            'export_url' => in_array($page, ['dashboard', 'users-roles', 'settings', 'subscription', 'reports'], true)
-                ? route('modules.export', match ($page) {
-                    'dashboard' => 'orders',
-                    'users-roles' => 'customers',
-                    'settings' => 'warehouses',
-                    'subscription' => 'invoices',
-                    'reports' => 'invoices',
-                })
-                : route('modules.export', $page),
+            'export_url' => match ($page) {
+                'printing' => null,
+                'dashboard' => route('modules.export', 'orders'),
+                'users-roles' => route('modules.export', 'customers'),
+                'settings' => route('modules.export', 'warehouses'),
+                'subscription' => route('modules.export', 'invoices'),
+                'reports' => route('modules.export', 'invoices'),
+                default => route('modules.export', $page),
+            },
+        ];
+    }
+
+    private function printingData(?Request $request = null): array
+    {
+        $printWidth = max((float) ($request?->query('print_width', 8.0) ?? 8.0), 0);
+        $printHeight = max((float) ($request?->query('print_height', 5.0) ?? 5.0), 0);
+        $sheetWidth = max((float) ($request?->query('sheet_width', 20.0) ?? 20.0), 0);
+        $sheetHeight = max((float) ($request?->query('sheet_height', 30.0) ?? 30.0), 0);
+
+        $verticalColumns = $printWidth > 0 ? (int) floor($sheetWidth / $printWidth) : 0;
+        $verticalRows = $printHeight > 0 ? (int) floor($sheetHeight / $printHeight) : 0;
+        $verticalTotal = $verticalColumns * $verticalRows;
+
+        $horizontalColumns = $printHeight > 0 ? (int) floor($sheetWidth / $printHeight) : 0;
+        $horizontalRows = $printWidth > 0 ? (int) floor($sheetHeight / $printWidth) : 0;
+        $horizontalTotal = $horizontalColumns * $horizontalRows;
+        $sheetArea = $sheetWidth * $sheetHeight;
+        $verticalUsedArea = $verticalTotal * ($printWidth * $printHeight);
+        $horizontalUsedArea = $horizontalTotal * ($printWidth * $printHeight);
+        $verticalWastageArea = max($sheetArea - $verticalUsedArea, 0);
+        $horizontalWastageArea = max($sheetArea - $horizontalUsedArea, 0);
+        $verticalWastagePercent = $sheetArea > 0 ? ($verticalWastageArea / $sheetArea) * 100 : 0;
+        $horizontalWastagePercent = $sheetArea > 0 ? ($horizontalWastageArea / $sheetArea) * 100 : 0;
+
+        return [
+            'eyebrow' => 'Print Planning',
+            'headline' => 'Calculate how many print pages fit on one main sheet in vertical and horizontal orientation.',
+            'description' => 'Enter page and sheet size, then compare both orientations with a visual layout.',
+            'actions' => ['Calculate Layout', 'Compare Orientation'],
+            'stats' => [
+                ['label' => 'Vertical Fit', 'value' => (string) $verticalTotal, 'note' => $verticalColumns . ' columns × ' . $verticalRows . ' rows'],
+                ['label' => 'Horizontal Fit', 'value' => (string) $horizontalTotal, 'note' => $horizontalColumns . ' columns × ' . $horizontalRows . ' rows'],
+                ['label' => 'Best Orientation', 'value' => $verticalTotal >= $horizontalTotal ? 'Vertical' : 'Horizontal', 'note' => 'higher output from same sheet'],
+                ['label' => 'Sheet Size', 'value' => rtrim(rtrim(number_format($sheetWidth, 2, '.', ''), '0'), '.') . ' × ' . rtrim(rtrim(number_format($sheetHeight, 2, '.', ''), '0'), '.'), 'note' => 'input main sheet dimensions'],
+            ],
+            'printing_calculator' => [
+                'inputs' => [
+                    'print_width' => $printWidth,
+                    'print_height' => $printHeight,
+                    'sheet_width' => $sheetWidth,
+                    'sheet_height' => $sheetHeight,
+                ],
+                'vertical' => [
+                    'columns' => $verticalColumns,
+                    'rows' => $verticalRows,
+                    'total' => $verticalTotal,
+                    'cell_width' => $printWidth,
+                    'cell_height' => $printHeight,
+                    'wastage_area' => round($verticalWastageArea, 2),
+                    'wastage_percent' => round($verticalWastagePercent, 2),
+                ],
+                'horizontal' => [
+                    'columns' => $horizontalColumns,
+                    'rows' => $horizontalRows,
+                    'total' => $horizontalTotal,
+                    'cell_width' => $printHeight,
+                    'cell_height' => $printWidth,
+                    'wastage_area' => round($horizontalWastageArea, 2),
+                    'wastage_percent' => round($horizontalWastagePercent, 2),
+                ],
+            ],
+            'table' => [
+                'title' => 'Orientation summary',
+                'columns' => ['Orientation', 'Columns', 'Rows', 'Total', 'Wastage Area', 'Wastage %'],
+                'rows' => [
+                    ['Vertical', (string) $verticalColumns, (string) $verticalRows, (string) $verticalTotal, (string) round($verticalWastageArea, 2), round($verticalWastagePercent, 2) . '%'],
+                    ['Horizontal', (string) $horizontalColumns, (string) $horizontalRows, (string) $horizontalTotal, (string) round($horizontalWastageArea, 2), round($horizontalWastagePercent, 2) . '%'],
+                ],
+            ],
+            'side_panel' => [
+                'title' => 'How it works',
+                'items' => [
+                    'Vertical: page width × page height',
+                    'Horizontal: page height × page width',
+                    'Columns = floor(sheet width / page width)',
+                    'Rows = floor(sheet height / page height)',
+                ],
+            ],
         ];
     }
 
@@ -487,7 +571,7 @@ class PortalController extends Controller
 
     private function ordersData(Tenant $tenant): array
     {
-        $orders = JobOrder::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+        $orders = JobOrder::with(['customer', 'payments'])->where('tenant_id', $tenant->id)->latest()->get();
 
         return [
             'eyebrow' => 'Order Management',
@@ -502,15 +586,29 @@ class PortalController extends Controller
             ],
             'table' => [
                 'title' => 'Order board',
-                'columns' => ['Order No', 'Customer', 'Job Title', 'Order Date', 'Expected Delivery', 'Status'],
-                'rows' => $orders->map(fn (JobOrder $order) => [
-                    $order->job_number,
-                    $order->customer?->company_name ?? '-',
-                    $order->job_title,
-                    optional($order->order_date)->format('M d, Y'),
-                    optional($order->due_date)->format('M d, Y'),
-                    str($order->status)->headline()->toString(),
-                ])->all(),
+                'columns' => ['Order No', 'Customer', 'Job Title', 'Order Date', 'Expected Delivery', 'Invoice Status', 'Status'],
+                'rows' => $orders->map(function (JobOrder $order): array {
+                    $totalAmount = (float) $order->estimated_total_price;
+                    $paidAmount = (float) $order->payments->sum('amount');
+
+                    if ($paidAmount <= 0.0001) {
+                        $invoiceStatus = 'Due';
+                    } elseif ($paidAmount + 0.0001 >= $totalAmount && $totalAmount > 0) {
+                        $invoiceStatus = 'Paid';
+                    } else {
+                        $invoiceStatus = 'Partial';
+                    }
+
+                    return [
+                        $order->job_number,
+                        $order->customer?->company_name ?? '-',
+                        $order->job_title,
+                        optional($order->order_date)->format('M d, Y'),
+                        optional($order->due_date)->format('M d, Y'),
+                        $invoiceStatus,
+                        str($order->status)->headline()->toString(),
+                    ];
+                })->all(),
                 'record_ids' => $orders->pluck('id')->all(),
                 'status_values' => $orders->pluck('status')->all(),
                 'status_options' => ['draft', 'confirmed', 'in_production', 'quality_check', 'delivered'],
@@ -560,6 +658,13 @@ class PortalController extends Controller
     private function invoicesData(Tenant $tenant): array
     {
         $invoices = Invoice::with('customer')->where('tenant_id', $tenant->id)->latest()->get();
+        $paidInvoices = $invoices->filter(function (Invoice $invoice): bool {
+            $total = (float) $invoice->total;
+            $paid = (float) $invoice->paid_amount;
+            $due = (float) $invoice->due_amount;
+
+            return $total > 0 && ($paid + 0.0001 >= $total || $due <= 0.0001);
+        })->count();
 
         return [
             'eyebrow' => 'Financial Management',
@@ -570,19 +675,33 @@ class PortalController extends Controller
                 ['label' => 'Invoices Issued', 'value' => (string) $invoices->count(), 'note' => 'all generated invoices'],
                 ['label' => 'Collected', 'value' => '$' . number_format((float) $invoices->sum('paid_amount'), 0), 'note' => 'payments received'],
                 ['label' => 'Due Amount', 'value' => '$' . number_format((float) $invoices->sum('due_amount'), 0), 'note' => 'outstanding balance'],
-                ['label' => 'Paid Invoices', 'value' => (string) $invoices->where('status', 'paid')->count(), 'note' => 'closed billing documents'],
+                ['label' => 'Paid Invoices', 'value' => (string) $paidInvoices, 'note' => 'closed billing documents'],
             ],
             'table' => [
                 'title' => 'Invoice register',
-                'columns' => ['Invoice No', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Status'],
-                'rows' => $invoices->map(fn (Invoice $invoice) => [
-                    $invoice->invoice_number,
-                    $invoice->customer?->company_name ?? '-',
-                    optional($invoice->invoice_date)->format('M d, Y'),
-                    optional($invoice->due_date)->format('M d, Y'),
-                    '$' . number_format((float) $invoice->total, 0),
-                    str($invoice->status)->headline()->toString(),
-                ])->all(),
+                'columns' => ['Invoice No', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Payment Status'],
+                'rows' => $invoices->map(function (Invoice $invoice): array {
+                    $total = (float) $invoice->total;
+                    $paid = (float) $invoice->paid_amount;
+                    $due = (float) $invoice->due_amount;
+
+                    if ($paid <= 0.0001 && $due > 0.0001) {
+                        $paymentStatus = 'Due';
+                    } elseif ($total > 0 && ($paid + 0.0001 >= $total || $due <= 0.0001)) {
+                        $paymentStatus = 'Paid';
+                    } else {
+                        $paymentStatus = 'Partial';
+                    }
+
+                    return [
+                        $invoice->invoice_number,
+                        $invoice->customer?->company_name ?? '-',
+                        optional($invoice->invoice_date)->format('M d, Y'),
+                        optional($invoice->due_date)->format('M d, Y'),
+                        '$' . number_format((float) $invoice->total, 0),
+                        $paymentStatus,
+                    ];
+                })->all(),
                 'record_ids' => $invoices->pluck('id')->all(),
             ],
             'side_panel' => [
@@ -662,20 +781,130 @@ class PortalController extends Controller
         ];
     }
 
-    private function reportsData(Tenant $tenant): array
+    private function reportsData(Tenant $tenant, ?Request $request = null): array
     {
-        $sales = (float) Invoice::where('tenant_id', $tenant->id)->sum('total');
-        $expenses = (float) Expense::where('tenant_id', $tenant->id)->sum('amount');
+        $period = $request?->query('period', 'monthly');
+        if (! in_array($period, ['monthly', 'day'], true)) {
+            $period = 'monthly';
+        }
+
+        $selectedMonth = (string) ($request?->query('month') ?: now()->format('Y-m'));
+        try {
+            $monthCursor = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        } catch (\Throwable) {
+            $monthCursor = now()->startOfMonth();
+            $selectedMonth = $monthCursor->format('Y-m');
+        }
+
+        $invoiceBase = Invoice::where('tenant_id', $tenant->id)->whereNotNull('invoice_date');
+        $expenseBase = Expense::where('tenant_id', $tenant->id)->whereNotNull('expense_date');
+
+        if ($period === 'day') {
+            $start = $monthCursor->copy()->startOfMonth();
+            $end = $monthCursor->copy()->endOfMonth();
+            $labels = collect(range(1, (int) $start->daysInMonth))
+                ->map(fn (int $day) => str_pad((string) $day, 2, '0', STR_PAD_LEFT))
+                ->values();
+
+            $invoiceRows = (clone $invoiceBase)
+                ->whereBetween('invoice_date', [$start->toDateString(), $end->toDateString()])
+                ->with('customer:id,company_name')
+                ->get(['customer_id', 'invoice_date', 'total', 'due_amount']);
+            $expenseRows = (clone $expenseBase)
+                ->whereBetween('expense_date', [$start->toDateString(), $end->toDateString()])
+                ->get(['expense_date', 'amount']);
+
+            $invoiceByKey = $invoiceRows
+                ->groupBy(fn (Invoice $invoice) => optional($invoice->invoice_date)->format('d'))
+                ->map(fn ($group) => (float) $group->sum('total'));
+            $expenseByKey = $expenseRows
+                ->groupBy(fn (Expense $expense) => optional($expense->expense_date)->format('d'))
+                ->map(fn ($group) => (float) $group->sum('amount'));
+        } else {
+            $year = (int) now()->year;
+            $labels = collect(range(1, 12))
+                ->map(fn (int $month) => Carbon::create($year, $month, 1)->format('M'))
+                ->values();
+
+            $invoiceRows = (clone $invoiceBase)
+                ->whereYear('invoice_date', $year)
+                ->with('customer:id,company_name')
+                ->get(['customer_id', 'invoice_date', 'total', 'due_amount']);
+            $expenseRows = (clone $expenseBase)
+                ->whereYear('expense_date', $year)
+                ->get(['expense_date', 'amount']);
+
+            $invoiceByKey = $invoiceRows
+                ->groupBy(fn (Invoice $invoice) => optional($invoice->invoice_date)->format('m'))
+                ->map(fn ($group) => (float) $group->sum('total'));
+            $expenseByKey = $expenseRows
+                ->groupBy(fn (Expense $expense) => optional($expense->expense_date)->format('m'))
+                ->map(fn ($group) => (float) $group->sum('amount'));
+        }
+
+        $revenueSeries = $labels->values()->map(function (string $label, int $index) use ($invoiceByKey, $period): float {
+            $key = $period === 'day' ? $label : str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT);
+
+            return (float) ($invoiceByKey[$key] ?? 0);
+        })->values();
+
+        $expenseSeries = $labels->values()->map(function (string $label, int $index) use ($expenseByKey, $period): float {
+            $key = $period === 'day' ? $label : str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT);
+
+            return (float) ($expenseByKey[$key] ?? 0);
+        })->values();
+
+        $profitSeries = $revenueSeries->zip($expenseSeries)->map(
+            fn ($pair): float => (float) $pair[0] - (float) $pair[1]
+        )->values();
+
+        $sales = (float) $revenueSeries->sum();
+        $expenses = (float) $expenseSeries->sum();
+
+        $customerRows = $invoiceRows
+            ->groupBy('customer_id')
+            ->map(function ($group, $customerId) {
+                $first = $group->first();
+                $customerName = $first?->customer?->company_name;
+                if (! $customerName && $customerId) {
+                    $customerName = Customer::find($customerId)?->company_name;
+                }
+
+                return [
+                    'customer' => $customerName ?: 'Unknown',
+                    'invoices' => (int) $group->count(),
+                    'revenue' => (float) $group->sum('total'),
+                    'due' => (float) $group->sum('due_amount'),
+                    'last_invoice' => optional($group->pluck('invoice_date')->filter()->sort()->last())->format('M d, Y'),
+                ];
+            })
+            ->sortByDesc('revenue')
+            ->take(10)
+            ->values();
 
         return [
             'eyebrow' => 'Analytics & Reporting',
             'headline' => 'Review daily orders, sales, dues, supplier payables, stock, and profitability.',
             'description' => 'These report cards are computed from the ERP records currently stored in the database.',
             'actions' => ['Run Report', 'Export Excel'],
+            'report_filters' => [
+                'period' => $period,
+                'month' => $selectedMonth,
+                'submit_url' => route('portal.page', ['page' => 'reports']),
+            ],
+            'chart' => [
+                'title' => 'Revenue vs Expense vs Profit',
+                'labels' => $labels->all(),
+                'series' => [
+                    'revenue' => $revenueSeries->map(fn (float $value) => round($value, 2))->all(),
+                    'expense' => $expenseSeries->map(fn (float $value) => round($value, 2))->all(),
+                    'profit' => $profitSeries->map(fn (float $value) => round($value, 2))->all(),
+                ],
+            ],
             'stats' => [
                 ['label' => 'Sales Total', 'value' => '$' . number_format($sales, 0), 'note' => 'invoice-backed sales'],
                 ['label' => 'Expense Total', 'value' => '$' . number_format($expenses, 0), 'note' => 'recorded operating costs'],
-                ['label' => 'Receivables', 'value' => '$' . number_format((float) Invoice::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'customer dues'],
+                ['label' => 'Receivables', 'value' => '$' . number_format((float) $invoiceRows->sum('due_amount'), 0), 'note' => 'customer dues'],
                 ['label' => 'Profit Estimate', 'value' => '$' . number_format($sales - $expenses, 0), 'note' => 'sales minus expenses'],
             ],
             'table' => [
@@ -687,6 +916,18 @@ class PortalController extends Controller
                     ['Inventory Report', 'Material stock and low alerts', 'Raw Materials', 'Live', 'Excel', 'Ready'],
                     ['Purchase Payables', 'Supplier due balances', 'Purchase Orders', 'Daily', 'Excel', 'Ready'],
                 ],
+            ],
+            'secondary_table' => [
+                'title' => 'Top Customer Report',
+                'columns' => ['Customer', 'Invoices', 'Revenue', 'Due', 'Last Invoice'],
+                'rows' => $customerRows->map(fn (array $row) => [
+                    $row['customer'],
+                    (string) $row['invoices'],
+                    '$' . number_format($row['revenue'], 2),
+                    '$' . number_format($row['due'], 2),
+                    $row['last_invoice'] ?: '-',
+                ])->all(),
+                'is_report' => true,
             ],
             'side_panel' => [
                 'title' => 'Core reports',

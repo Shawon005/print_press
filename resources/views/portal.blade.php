@@ -67,6 +67,9 @@
                                         @case('chart')
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16" /><path d="M7 15V9M12 15V5M17 15v-3" /></svg>
                                             @break
+                                        @case('printer')
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8V4h10v4" /><rect x="4" y="8" width="16" height="8" rx="2" /><path d="M7 16h10v4H7z" /></svg>
+                                            @break
                                         @case('shield')
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 5 6v6c0 5 3.5 8 7 9 3.5-1 7-4 7-9V6l-7-3Z" /><path d="m9.5 12 1.8 1.8 3.2-3.6" /></svg>
                                             @break
@@ -240,6 +243,131 @@
                             </section>
                         @else
                         <section class="grid gap-6 ">
+                            @if ($currentPage === 'reports' && !empty($pageData['report_filters']))
+                                <article class="surface-card p-6">
+                                    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                                        <div>
+                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Report Filters</p>
+                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">Choose period and range</h3>
+                                        </div>
+                                        <form method="GET" action="{{ $pageData['report_filters']['submit_url'] }}" class="flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Period</label>
+                                                <select name="period" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                                                    <option value="monthly" @selected(($pageData['report_filters']['period'] ?? 'monthly') === 'monthly')>Monthly</option>
+                                                    <option value="day" @selected(($pageData['report_filters']['period'] ?? 'monthly') === 'day')>Day</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Month</label>
+                                                <input type="month" name="month" value="{{ $pageData['report_filters']['month'] ?? now()->format('Y-m') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                                            </div>
+                                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Apply Filter</button>
+                                        </form>
+                                    </div>
+                                </article>
+                            @endif
+
+                            @if ($currentPage === 'reports' && !empty($pageData['chart']))
+                                <article class="surface-card p-6">
+                                    <div class="mb-4">
+                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Financial Chart</p>
+                                        <h3 class="text-2xl font-black tracking-tight text-slate-900">{{ $pageData['chart']['title'] }}</h3>
+                                    </div>
+                                    <div class="h-[360px]">
+                                        <canvas id="reports-financial-chart"></canvas>
+                                    </div>
+                                </article>
+                            @endif
+
+                            @if ($currentPage === 'printing' && !empty($pageData['printing_calculator']))
+                                <article class="surface-card p-6">
+                                    <div class="mb-6">
+                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Sheet Calculator</p>
+                                        <h3 class="text-2xl font-black tracking-tight text-slate-900">Page Fit by Orientation</h3>
+                                    </div>
+                                    <form method="GET" action="{{ route('portal.page', 'printing') }}" class="grid gap-4 md:grid-cols-4">
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Print Width</span>
+                                            <input type="number" step="0.01" min="0" name="print_width" value="{{ $pageData['printing_calculator']['inputs']['print_width'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Print Height</span>
+                                            <input type="number" step="0.01" min="0" name="print_height" value="{{ $pageData['printing_calculator']['inputs']['print_height'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width</span>
+                                            <input type="number" step="0.01" min="0" name="sheet_width" value="{{ $pageData['printing_calculator']['inputs']['sheet_width'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height</span>
+                                            <input type="number" step="0.01" min="0" name="sheet_height" value="{{ $pageData['printing_calculator']['inputs']['sheet_height'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <div class="md:col-span-4">
+                                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Calculate</button>
+                                        </div>
+                                    </form>
+                                    <div class="mt-8 grid gap-6 lg:grid-cols-2">
+                                        @foreach (['vertical' => 'Vertical', 'horizontal' => 'Horizontal'] as $orientationKey => $orientationLabel)
+                                            @php
+                                                $layout = $pageData['printing_calculator'][$orientationKey];
+                                                $cols = $layout['columns'];
+                                                $rows = $layout['rows'];
+                                                $svgWidth = 420.0;
+                                                $svgHeight = 260.0;
+                                                $sheetInputWidth = max((float) ($pageData['printing_calculator']['inputs']['sheet_width'] ?? 0), 0.0);
+                                                $sheetInputHeight = max((float) ($pageData['printing_calculator']['inputs']['sheet_height'] ?? 0), 0.0);
+                                                $printCellWidth = max((float) ($layout['cell_width'] ?? 0), 0.0);
+                                                $printCellHeight = max((float) ($layout['cell_height'] ?? 0), 0.0);
+
+                                                $scale = ($sheetInputWidth > 0 && $sheetInputHeight > 0)
+                                                    ? min($svgWidth / $sheetInputWidth, $svgHeight / $sheetInputHeight)
+                                                    : 0;
+
+                                                $drawSheetWidth = $scale > 0 ? $sheetInputWidth * $scale : $svgWidth;
+                                                $drawSheetHeight = $scale > 0 ? $sheetInputHeight * $scale : $svgHeight;
+                                                $offsetX = ($svgWidth - $drawSheetWidth) / 2;
+                                                $offsetY = ($svgHeight - $drawSheetHeight) / 2;
+
+                                                $cellWidth = $printCellWidth * $scale;
+                                                $cellHeight = $printCellHeight * $scale;
+                                                $usedWidth = $cols > 0 ? $cellWidth * $cols : 0;
+                                                $usedHeight = $rows > 0 ? $cellHeight * $rows : 0;
+                                            @endphp
+                                            <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                                <div class="mb-3 flex items-center justify-between">
+                                                    <h4 class="text-lg font-bold text-slate-900">{{ $orientationLabel }}</h4>
+                                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{{ $layout['total'] }} pages</span>
+                                                </div>
+                                                <p class="text-sm text-slate-600">{{ $layout['columns'] }} columns × {{ $layout['rows'] }} rows</p>
+                                                <p class="mb-3 text-sm text-rose-600">Wastage: {{ number_format($layout['wastage_area'], 2) }} sq unit ({{ number_format($layout['wastage_percent'], 2) }}%)</p>
+                                                <svg viewBox="0 0 {{ $svgWidth }} {{ $svgHeight }}" class="w-full rounded-xl border border-slate-300 bg-white">
+                                                    <rect x="0.5" y="0.5" width="{{ $svgWidth - 1 }}" height="{{ $svgHeight - 1 }}" fill="#ffffff" stroke="#334155" stroke-width="1" />
+                                                    <rect x="{{ $offsetX }}" y="{{ $offsetY }}" width="{{ $drawSheetWidth }}" height="{{ $drawSheetHeight }}" fill="#ffffff" stroke="#334155" stroke-width="1" />
+                                                    @if ($cols > 0 && $rows > 0 && $scale > 0)
+                                                        @for ($r = 0; $r < $rows; $r++)
+                                                            @for ($c = 0; $c < $cols; $c++)
+                                                                <rect x="{{ $offsetX + ($c * $cellWidth) + 0.8 }}" y="{{ $offsetY + ($r * $cellHeight) + 0.8 }}" width="{{ max($cellWidth - 1.6, 0) }}" height="{{ max($cellHeight - 1.6, 0) }}" fill="{{ $orientationKey === 'vertical' ? '#dbeafe' : '#dcfce7' }}" stroke="{{ $orientationKey === 'vertical' ? '#2563eb' : '#16a34a' }}" stroke-width="0.8" />
+                                                            @endfor
+                                                        @endfor
+
+                                                        @if ($usedWidth < $drawSheetWidth)
+                                                            <rect x="{{ $offsetX + $usedWidth }}" y="{{ $offsetY }}" width="{{ $drawSheetWidth - $usedWidth }}" height="{{ $drawSheetHeight }}" fill="#fee2e2" opacity="0.75" />
+                                                        @endif
+                                                        @if ($usedHeight < $drawSheetHeight)
+                                                            <rect x="{{ $offsetX }}" y="{{ $offsetY + $usedHeight }}" width="{{ min($usedWidth, $drawSheetWidth) }}" height="{{ $drawSheetHeight - $usedHeight }}" fill="#fecaca" opacity="0.65" />
+                                                        @endif
+                                                    @else
+                                                        <rect x="{{ $offsetX }}" y="{{ $offsetY }}" width="{{ $drawSheetWidth }}" height="{{ $drawSheetHeight }}" fill="#fee2e2" opacity="0.75" />
+                                                    @endif
+                                                </svg>
+                                                <p class="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-700">Red shaded area = wastage</p>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </article>
+                            @endif
+
                             <article class="surface-card p-6">
                                 @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
                                     <form id="quotation-batch-print-form" method="POST" action="{{ route('quotations.print-batch') }}">
@@ -292,6 +420,13 @@
                                                         <td class="px-4 py-4 {{ $loop->first ? 'rounded-l-2xl font-semibold text-slate-900' : '' }} {{ $loop->last ? 'rounded-r-2xl' : '' }}">
                                                             @if ($loop->last)
                                                                 <span class="status-pill">{{ $cell }}</span>
+                                                            @elseif (
+                                                                $currentPage === 'orders'
+                                                                && (($pageData['table']['columns'][$loop->index] ?? null) === 'Invoice Status')
+                                                            )
+                                                                <a href="{{ route('portal.page', 'invoices') }}" class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-[var(--brand)] hover:bg-slate-100">
+                                                                    {{ $cell }}
+                                                                </a>
                                                             @else
                                                                 {{ $cell }}
                                                             @endif
@@ -311,6 +446,9 @@
                                                                         </select>
                                                                         <button type="submit" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Update</button>
                                                                     </form>
+                                                                @endif
+                                                                @if (in_array($rowModule, ['orders', 'quotations'], true))
+                                                                    <a href="{{ route('modules.show', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">View</a>
                                                                 @endif
                                                                 @php($printableModules = ['customers', 'suppliers', 'products', 'raw-materials', 'warehouses', 'quotations', 'orders', 'purchases', 'invoices', 'deliveries', 'expenses', 'users', 'roles', 'paper-types', 'ink-types', 'standard-sheets', 'units'])
                                                                 @if (in_array($rowModule, $printableModules, true))
@@ -336,10 +474,12 @@
                                 <article class="surface-card p-6">
                                     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
                                         <div>
-                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Role Access</p>
+                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">{{ !empty($pageData['secondary_table']['is_report']) ? 'Customer Analytics' : 'Role Access' }}</p>
                                             <h3 class="text-2xl font-black tracking-tight text-slate-900">{{ $pageData['secondary_table']['title'] }}</h3>
                                         </div>
-                                        <a href="{{ route('modules.create', $pageData['secondary_table']['module']) }}" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Add Role</a>
+                                        @if (empty($pageData['secondary_table']['is_report']))
+                                            <a href="{{ route('modules.create', $pageData['secondary_table']['module']) }}" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Add Role</a>
+                                        @endif
                                     </div>
 
                                     <div class="overflow-x-auto">
@@ -349,7 +489,9 @@
                                                     @foreach ($pageData['secondary_table']['columns'] as $column)
                                                         <th class="px-4">{{ $column }}</th>
                                                     @endforeach
-                                                    <th class="px-4 text-right">Actions</th>
+                                                    @if (empty($pageData['secondary_table']['is_report']))
+                                                        <th class="px-4 text-right">Actions</th>
+                                                    @endif
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -358,17 +500,19 @@
                                                         @foreach ($row as $cell)
                                                             <td class="px-4 py-4 {{ $loop->first ? 'rounded-l-2xl font-semibold text-slate-900' : '' }}">{{ $cell }}</td>
                                                         @endforeach
-                                                        <td class="rounded-r-2xl px-4 py-4 text-right">
-                                                            <div class="flex flex-wrap justify-end gap-2">
-                                                                <a href="{{ route('modules.print', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
-                                                                <a href="{{ route('modules.edit', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
-                                                                <form method="POST" action="{{ route('modules.destroy', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this role?')">
-                                                                    @csrf
-                                                                    @method('DELETE')
-                                                                    <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
-                                                                </form>
-                                                            </div>
-                                                        </td>
+                                                        @if (empty($pageData['secondary_table']['is_report']))
+                                                            <td class="rounded-r-2xl px-4 py-4 text-right">
+                                                                <div class="flex flex-wrap justify-end gap-2">
+                                                                    <a href="{{ route('modules.print', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
+                                                                    <a href="{{ route('modules.edit', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
+                                                                    <form method="POST" action="{{ route('modules.destroy', [$pageData['secondary_table']['module'], $pageData['secondary_table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this role?')">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
+                                                                    </form>
+                                                                </div>
+                                                            </td>
+                                                        @endif
                                                     </tr>
                                                 @endforeach
                                             </tbody>
@@ -421,6 +565,65 @@
                                 return current.checked;
                             });
                         });
+                    });
+                });
+            </script>
+        @endif
+        @if ($currentPage === 'reports' && !empty($pageData['chart']))
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const canvas = document.getElementById('reports-financial-chart');
+                    if (!canvas) return;
+
+                    const chartData = @json($pageData['chart']);
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: chartData.labels,
+                            datasets: [
+                                {
+                                    label: 'Revenue',
+                                    data: chartData.series.revenue,
+                                    borderColor: '#0f766e',
+                                    backgroundColor: 'rgba(15,118,110,0.12)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Expense',
+                                    data: chartData.series.expense,
+                                    borderColor: '#dc2626',
+                                    backgroundColor: 'rgba(220,38,38,0.12)',
+                                    tension: 0.3,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Profit',
+                                    data: chartData.series.profit,
+                                    borderColor: '#2563eb',
+                                    backgroundColor: 'rgba(37,99,235,0.12)',
+                                    tension: 0.3,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top' }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: {
+                                        callback: function (value) {
+                                            return '$' + Number(value).toLocaleString();
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     });
                 });
             </script>

@@ -30,10 +30,12 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use App\Services\PrintCalculationService;
 
@@ -130,6 +132,33 @@ class ModuleRecordController extends Controller
         ]);
     }
 
+    public function show(string $module, int $id): View
+    {
+        if ($module === 'orders') {
+            $record = JobOrder::with([
+                'customer',
+                'paperType',
+                'creator',
+                'calculations' => fn ($query) => $query->latest('computed_at'),
+            ])->findOrFail($id);
+
+            return view('modules.orders-show', [
+                'record' => $record,
+                'latestCalculation' => $record->calculations->first(),
+            ]);
+        }
+
+        if ($module === 'quotations') {
+            $record = Quotation::with(['customer', 'items'])->findOrFail($id);
+
+            return view('modules.quotations-show', [
+                'record' => $record,
+            ]);
+        }
+
+        abort(404);
+    }
+
     public function store(Request $request, string $module): RedirectResponse
     {
         if ($module === 'orders') {
@@ -137,8 +166,9 @@ class ModuleRecordController extends Controller
             $user = $request->user();
 
             $data = $request->validate($this->printingOrderRules());
+            $designMeta = $this->storeDesignFile($request, $tenant->id, 'orders');
 
-            DB::transaction(function () use ($data, $tenant, $user): void {
+            DB::transaction(function () use ($data, $tenant, $user, $designMeta): void {
                 $calculation = $this->printCalculationService->calculate([
                     'total_pages' => $data['total_pages'],
                     'page_size' => $data['page_size'],
@@ -179,6 +209,10 @@ class ModuleRecordController extends Controller
                     'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0),
                     'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
                     'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
+                    'design_source' => $data['design_source'] ?? 'customer_provided',
+                    'design_file_path' => $designMeta['design_file_path'] ?? null,
+                    'design_file_name' => $designMeta['design_file_name'] ?? null,
+                    'design_file_mime' => $designMeta['design_file_mime'] ?? null,
                     'notes' => $data['notes'] ?? null,
                 ]);
 
@@ -204,8 +238,9 @@ class ModuleRecordController extends Controller
             $tenant = $this->tenant();
             $user = $request->user();
             $data = $request->validate($this->quotationRules());
+            $designMeta = $this->storeDesignFile($request, $tenant->id, 'quotations');
 
-            $quotation = DB::transaction(function () use ($data, $tenant, $user): Quotation {
+            $quotation = DB::transaction(function () use ($data, $tenant, $user, $designMeta): Quotation {
                 $subtotal = collect($data['items'])->sum(function (array $item): float {
                     return ((float) $item['quantity']) * ((float) $item['unit_price']);
                 });
@@ -228,6 +263,10 @@ class ModuleRecordController extends Controller
                     'profit_percentage' => $profitPercentage,
                     'profit_amount' => $profitAmount,
                     'total' => $total,
+                    'design_source' => $data['design_source'] ?? 'customer_provided',
+                    'design_file_path' => $designMeta['design_file_path'] ?? null,
+                    'design_file_name' => $designMeta['design_file_name'] ?? null,
+                    'design_file_mime' => $designMeta['design_file_mime'] ?? null,
                     'notes' => $data['notes'] ?? null,
                     'created_by' => $user?->id,
                     'approved_at' => ($data['status'] ?? null) === 'approved' ? now() : null,
@@ -264,8 +303,14 @@ class ModuleRecordController extends Controller
         if ($module === 'orders') {
             $data = $request->validate($this->printingOrderRules());
             $record = JobOrder::findOrFail($id);
+            $designMeta = null;
 
-            DB::transaction(function () use ($data, $record): void {
+            if ($request->hasFile('design_file')) {
+                $this->deleteDesignFile($record->design_file_path);
+                $designMeta = $this->storeDesignFile($request, (int) $record->tenant_id, 'orders');
+            }
+
+            DB::transaction(function () use ($data, $record, $designMeta): void {
                 $calculation = $this->printCalculationService->calculate([
                     'total_pages' => $data['total_pages'],
                     'page_size' => $data['page_size'],
@@ -303,6 +348,10 @@ class ModuleRecordController extends Controller
                     'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0) + (float) $record->estimated_plate_cost,
                     'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
                     'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
+                    'design_source' => $data['design_source'] ?? $record->design_source,
+                    'design_file_path' => $designMeta['design_file_path'] ?? $record->design_file_path,
+                    'design_file_name' => $designMeta['design_file_name'] ?? $record->design_file_name,
+                    'design_file_mime' => $designMeta['design_file_mime'] ?? $record->design_file_mime,
                     'notes' => $data['notes'] ?? null,
                 ]);
 
@@ -329,8 +378,14 @@ class ModuleRecordController extends Controller
         if ($module === 'quotations') {
             $data = $request->validate($this->quotationRules());
             $quotation = Quotation::findOrFail($id);
+            $designMeta = null;
 
-            DB::transaction(function () use ($data, $quotation): void {
+            if ($request->hasFile('design_file')) {
+                $this->deleteDesignFile($quotation->design_file_path);
+                $designMeta = $this->storeDesignFile($request, (int) $quotation->tenant_id, 'quotations');
+            }
+
+            DB::transaction(function () use ($data, $quotation, $designMeta): void {
                 $subtotal = collect($data['items'])->sum(function (array $item): float {
                     return ((float) $item['quantity']) * ((float) $item['unit_price']);
                 });
@@ -352,6 +407,10 @@ class ModuleRecordController extends Controller
                     'profit_percentage' => $profitPercentage,
                     'profit_amount' => $profitAmount,
                     'total' => $total,
+                    'design_source' => $data['design_source'] ?? $quotation->design_source,
+                    'design_file_path' => $designMeta['design_file_path'] ?? $quotation->design_file_path,
+                    'design_file_name' => $designMeta['design_file_name'] ?? $quotation->design_file_name,
+                    'design_file_mime' => $designMeta['design_file_mime'] ?? $quotation->design_file_mime,
                     'notes' => $data['notes'] ?? null,
                     'approved_at' => ($data['status'] ?? null) === 'approved' ? now() : null,
                 ]);
@@ -384,13 +443,16 @@ class ModuleRecordController extends Controller
     public function destroy(string $module, int $id): RedirectResponse
     {
         if ($module === 'orders') {
-            JobOrder::findOrFail($id)->delete();
+            $jobOrder = JobOrder::findOrFail($id);
+            $this->deleteDesignFile($jobOrder->design_file_path);
+            $jobOrder->delete();
 
             return redirect()->route('portal.page', ['page' => 'orders'])
                 ->with('success', 'Printing order deleted successfully.');
         }
         if ($module === 'quotations') {
             $quotation = Quotation::findOrFail($id);
+            $this->deleteDesignFile($quotation->design_file_path);
             $quotation->items()->delete();
             $quotation->delete();
 
@@ -535,6 +597,26 @@ class ModuleRecordController extends Controller
         return response()->json($this->printCalculationService->calculate($payload));
     }
 
+    public function invoiceJobOrderSummary(int $id): JsonResponse
+    {
+        $tenant = $this->tenant();
+        $jobOrder = JobOrder::with('payments')
+            ->where('tenant_id', $tenant->id)
+            ->findOrFail($id);
+
+        $totalAmount = (float) $jobOrder->estimated_total_price;
+        $paidAmount = (float) $jobOrder->payments->sum('amount');
+        $remainingAmount = max($totalAmount - $paidAmount, 0);
+
+        return response()->json([
+            'job_order_id' => $jobOrder->id,
+            'customer_id' => $jobOrder->customer_id,
+            'total_amount' => round($totalAmount, 2),
+            'paid_amount' => round($paidAmount, 2),
+            'remaining_amount' => round($remainingAmount, 2),
+        ]);
+    }
+
     private function tenant(): Tenant
     {
         return Tenant::firstOrFail();
@@ -574,7 +656,18 @@ class ModuleRecordController extends Controller
             'raw_material_categories' => RawMaterialCategory::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'warehouses' => Warehouse::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'quotations' => Quotation::where('tenant_id', $tenant->id)->pluck('quote_number', 'id')->all(),
-            'orders' => Order::where('tenant_id', $tenant->id)->pluck('order_number', 'id')->all(),
+            'orders' => Order::where('tenant_id', $tenant->id)
+                ->orderByDesc('id')
+                ->get(['id', 'order_number'])
+                ->mapWithKeys(fn (Order $order) => [
+                    $order->id => (($order->order_number ?: 'Order') . ' (ID: ' . $order->id . ')'),
+                ])->all(),
+            'job_orders' => JobOrder::where('tenant_id', $tenant->id)
+                ->orderByDesc('id')
+                ->get(['id', 'job_number', 'job_title'])
+                ->mapWithKeys(fn (JobOrder $order) => [
+                    $order->id => (($order->job_number ?: 'JOB') . ' - ' . ($order->job_title ?: 'Untitled') . ' (ID: ' . $order->id . ')'),
+                ])->all(),
             'users' => User::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'roles' => \App\Models\Role::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'paper_types' => PaperType::where(fn ($q) => $q->where('tenant_id', $tenant->id)->orWhereNull('tenant_id'))->pluck('name', 'id')->all(),
@@ -609,6 +702,8 @@ class ModuleRecordController extends Controller
             'estimated_other_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_unit_price' => ['nullable', 'numeric', 'min:0'],
             'status' => ['nullable', 'in:draft,confirmed,in_production,quality_check,delivered'],
+            'design_source' => ['nullable', 'in:customer_provided,in_house'],
+            'design_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -740,13 +835,14 @@ class ModuleRecordController extends Controller
 
     private function invoicePrintPayload(int $id, int $tenantId): array
     {
-        $invoice = Invoice::with(['customer', 'order'])
+        $invoice = Invoice::with(['customer', 'order', 'jobOrder'])
             ->where('tenant_id', $tenantId)
             ->findOrFail($id);
+        $companyProfile = $this->companyProfileData($tenantId);
 
         return [
             'view' => 'print.invoice',
-            'data' => compact('invoice'),
+            'data' => compact('invoice', 'companyProfile'),
             'filename' => 'invoice-' . $invoice->invoice_number,
         ];
     }
@@ -824,6 +920,8 @@ class ModuleRecordController extends Controller
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
             'profit_percentage' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'design_source' => ['nullable', 'in:customer_provided,in_house'],
+            'design_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
@@ -851,6 +949,71 @@ class ModuleRecordController extends Controller
                 'specification_json' => null,
             ]);
         }
+    }
+
+    private function storeDesignFile(Request $request, int $tenantId, string $module): ?array
+    {
+        if (! $request->hasFile('design_file')) {
+            return null;
+        }
+
+        $file = $request->file('design_file');
+        if (! $file) {
+            return null;
+        }
+
+        $path = $file->store('designs/tenant-' . $tenantId . '/' . $module, 'public');
+
+        return [
+            'design_file_path' => $path,
+            'design_file_name' => $file->getClientOriginalName(),
+            'design_file_mime' => $file->getClientMimeType(),
+        ];
+    }
+
+    private function deleteDesignFile(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function syncInvoiceToJobPayments(Invoice $invoice): void
+    {
+        $referenceNo = 'INV-ID-' . $invoice->id;
+
+        JobPayment::query()
+            ->where('tenant_id', $invoice->tenant_id)
+            ->where('reference_no', $referenceNo)
+            ->delete();
+
+        if (! $invoice->job_order_id) {
+            return;
+        }
+
+        $paidAmount = (float) $invoice->paid_amount;
+        if ($paidAmount <= 0.0001) {
+            return;
+        }
+
+        $totalAmount = (float) $invoice->total;
+        $paymentStage = ($totalAmount > 0 && $paidAmount + 0.0001 >= $totalAmount) ? 'final' : 'partial';
+
+        JobPayment::create([
+            'tenant_id' => $invoice->tenant_id,
+            'job_order_id' => $invoice->job_order_id,
+            'payment_stage' => $paymentStage,
+            'amount' => $paidAmount,
+            'payment_date' => optional($invoice->invoice_date)->toDateString() ?? now()->toDateString(),
+            'payment_method' => 'invoice',
+            'reference_no' => $referenceNo,
+            'notes' => 'Auto-posted from invoice ' . $invoice->invoice_number,
+            'recorded_by' => $invoice->created_by,
+        ]);
     }
 
     private function config(string $module): ?array
@@ -1172,36 +1335,71 @@ class ModuleRecordController extends Controller
                 'fields' => [
                     ['name' => 'invoice_number', 'label' => 'Invoice Number', 'type' => 'text'],
                     ['name' => 'customer_id', 'label' => 'Customer', 'type' => 'select', 'source' => 'customers'],
-                    ['name' => 'order_id', 'label' => 'Order', 'type' => 'select', 'source' => 'orders', 'nullable' => true],
+                    ['name' => 'job_order_id', 'label' => 'Job Order', 'type' => 'select', 'source' => 'job_orders', 'nullable' => true],
                     ['name' => 'invoice_date', 'label' => 'Invoice Date', 'type' => 'date'],
                     ['name' => 'due_date', 'label' => 'Due Date', 'type' => 'date'],
                     ['name' => 'subtotal', 'label' => 'Subtotal', 'type' => 'number'],
                     ['name' => 'discount', 'label' => 'Discount', 'type' => 'number'],
                     ['name' => 'tax', 'label' => 'Tax', 'type' => 'number'],
+                    ['name' => 'bill_to_name', 'label' => 'Bill To Name', 'type' => 'text'],
+                    ['name' => 'bill_to_phone', 'label' => 'Bill To Phone', 'type' => 'text'],
+                    ['name' => 'bill_to_email', 'label' => 'Bill To Email', 'type' => 'text'],
+                    ['name' => 'bill_to_address', 'label' => 'Bill To Address', 'type' => 'text'],
+                    ['name' => 'payment_method_title', 'label' => 'Payment Method Title', 'type' => 'text'],
+                    ['name' => 'bank_name', 'label' => 'Bank Name', 'type' => 'text'],
+                    ['name' => 'bank_account_number', 'label' => 'Bank Account Number', 'type' => 'text'],
+                    ['name' => 'terms_and_conditions', 'label' => 'Terms And Conditions', 'type' => 'text'],
+                    ['name' => 'footer_phone', 'label' => 'Footer Phone', 'type' => 'text'],
+                    ['name' => 'footer_email', 'label' => 'Footer Email', 'type' => 'text'],
+                    ['name' => 'footer_address', 'label' => 'Footer Address', 'type' => 'text'],
+                    ['name' => 'signature_label', 'label' => 'Signature Label', 'type' => 'text'],
                     ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['draft' => 'Draft', 'due' => 'Due', 'paid' => 'Paid']],
                 ],
                 'rules' => [
                     'invoice_number' => ['required', 'string', 'max:255'],
                     'customer_id' => ['required', 'integer'],
-                    'order_id' => ['nullable', 'integer'],
+                    'job_order_id' => ['nullable', 'exists:job_orders,id'],
                     'invoice_date' => ['nullable', 'date'],
                     'due_date' => ['nullable', 'date'],
                     'subtotal' => ['required', 'numeric'],
                     'discount' => ['nullable', 'numeric'],
                     'tax' => ['nullable', 'numeric'],
+                    'bill_to_name' => ['nullable', 'string', 'max:255'],
+                    'bill_to_phone' => ['nullable', 'string', 'max:255'],
+                    'bill_to_email' => ['nullable', 'string', 'max:255'],
+                    'bill_to_address' => ['nullable', 'string'],
+                    'payment_method_title' => ['nullable', 'string', 'max:255'],
+                    'bank_name' => ['nullable', 'string', 'max:255'],
+                    'bank_account_number' => ['nullable', 'string', 'max:255'],
+                    'terms_and_conditions' => ['nullable', 'string'],
+                    'footer_phone' => ['nullable', 'string', 'max:255'],
+                    'footer_email' => ['nullable', 'string', 'max:255'],
+                    'footer_address' => ['nullable', 'string', 'max:255'],
+                    'signature_label' => ['nullable', 'string', 'max:255'],
                     'status' => ['required', 'string'],
                 ],
                 'payload' => function ($data, $tenant, $user) {
                     $total = ($data['subtotal'] ?? 0) - ($data['discount'] ?? 0) + ($data['tax'] ?? 0);
+                    $customer = Customer::query()->find($data['customer_id'] ?? null);
 
                     return array_merge($data, [
                         'tenant_id' => $tenant->id,
+                        'order_id' => null,
                         'total' => $total,
                         'paid_amount' => ($data['status'] ?? null) === 'paid' ? $total : 0,
                         'due_amount' => ($data['status'] ?? null) === 'paid' ? 0 : $total,
+                        'bill_to_name' => $data['bill_to_name'] ?? $customer?->company_name,
+                        'bill_to_phone' => $data['bill_to_phone'] ?? $customer?->phone,
+                        'bill_to_email' => $data['bill_to_email'] ?? $customer?->email,
+                        'bill_to_address' => $data['bill_to_address'] ?? $customer?->billing_address,
+                        'payment_method_title' => $data['payment_method_title'] ?? 'Bank Transfer',
+                        'terms_and_conditions' => $data['terms_and_conditions'] ?? 'Custom terms and conditions based on your business.',
+                        'signature_label' => $data['signature_label'] ?? 'Authorized Signature',
                         'created_by' => $user?->id,
                     ]);
                 },
+                'after_store' => fn (Invoice $invoice) => $this->syncInvoiceToJobPayments($invoice),
+                'after_update' => fn (Invoice $invoice) => $this->syncInvoiceToJobPayments($invoice),
                 'export' => fn ($tenant) => array_merge([['Invoice Number', 'Customer ID', 'Invoice Date', 'Due Date', 'Total', 'Status']], Invoice::where('tenant_id', $tenant->id)->get(['invoice_number', 'customer_id', 'invoice_date', 'due_date', 'total', 'status'])->map(fn ($i) => [$i->invoice_number, $i->customer_id, $i->invoice_date, $i->due_date, $i->total, $i->status])->all()),
             ],
             'expenses' => [

@@ -39,6 +39,10 @@ class JobOrder extends Model
         'estimated_total_cost',
         'estimated_unit_price',
         'estimated_total_price',
+        'design_source',
+        'design_file_path',
+        'design_file_name',
+        'design_file_mime',
         'notes',
     ];
 

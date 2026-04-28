@@ -56,6 +56,14 @@
                             </div>
                         @endforeach
 
+                        @if ($module === 'invoices')
+                            <div class="md:col-span-2">
+                                <p id="invoice-job-order-summary" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                    Select a Job Order to auto-fill subtotal with remaining amount.
+                                </p>
+                            </div>
+                        @endif
+
                         <div class="md:col-span-2 flex flex-wrap gap-3 pt-2">
                             <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $record ? 'Update Record' : 'Save Record' }}</button>
                             <a href="{{ $module === 'dashboard' ? route('portal.home') : route('portal.page', $moduleBackPage) }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">Cancel</a>
@@ -64,5 +72,50 @@
                 </div>
             </div>
         </div>
+        @if ($module === 'invoices')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const jobOrderSelect = document.getElementById('job_order_id');
+                    const subtotalInput = document.getElementById('subtotal');
+                    const customerInput = document.getElementById('customer_id');
+                    const summary = document.getElementById('invoice-job-order-summary');
+
+                    if (!jobOrderSelect || !subtotalInput || !summary) {
+                        return;
+                    }
+
+                    const currency = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    jobOrderSelect.addEventListener('change', async function () {
+                        const jobOrderId = jobOrderSelect.value;
+                        if (!jobOrderId) {
+                            summary.textContent = 'Select a Job Order to auto-fill subtotal with remaining amount.';
+                            return;
+                        }
+
+                        summary.textContent = 'Loading order balance...';
+
+                        try {
+                            const response = await fetch(`{{ url('/invoices/job-orders') }}/${jobOrderId}/summary`);
+                            if (!response.ok) {
+                                throw new Error('Request failed');
+                            }
+
+                            const payload = await response.json();
+                            subtotalInput.value = Number(payload.remaining_amount || 0).toFixed(2);
+
+                            if (customerInput && payload.customer_id) {
+                                customerInput.value = String(payload.customer_id);
+                            }
+
+                            summary.textContent =
+                                `Order Total: ${currency.format(payload.total_amount || 0)} | Paid: ${currency.format(payload.paid_amount || 0)} | Remaining: ${currency.format(payload.remaining_amount || 0)}`;
+                        } catch (error) {
+                            summary.textContent = 'Could not load remaining amount for this job order.';
+                        }
+                    });
+                });
+            </script>
+        @endif
     </body>
 </html>

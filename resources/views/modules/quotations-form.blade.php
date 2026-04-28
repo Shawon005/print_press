@@ -19,7 +19,7 @@
             <a href="{{ route('portal.page', 'quotations') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Back to Quotations</a>
         </div>
 
-        <form method="POST" action="{{ $formAction }}" class="surface-card p-6 md:p-8 space-y-6">
+        <form method="POST" action="{{ $formAction }}" enctype="multipart/form-data" class="surface-card p-6 md:p-8 space-y-6">
             @csrf
             @if ($formMethod !== 'POST') @method($formMethod) @endif
 
@@ -116,6 +116,23 @@
                 <div>
                     <label class="mb-2 block text-sm font-semibold">Notes</label>
                     <textarea name="notes" rows="2" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" placeholder="Note: Excluding VAT & TAX / payment terms etc.">{{ old('notes', $record?->notes) }}</textarea>
+                </div>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold">Design Source</label>
+                    <select name="design_source" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                        <option value="customer_provided" @selected(old('design_source', $record?->design_source ?? 'customer_provided') === 'customer_provided')>Customer Provided</option>
+                        <option value="in_house" @selected(old('design_source', $record?->design_source ?? 'customer_provided') === 'in_house')>In House</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-2 block text-sm font-semibold">Design File (Image/PDF)</label>
+                    <input type="file" name="design_file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                    @if ($record?->design_file_path)
+                        <p class="mt-2 text-xs text-slate-500">Current file: <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($record->design_file_path) }}" target="_blank" class="font-semibold text-[var(--brand)] hover:underline">{{ $record->design_file_name ?: 'View uploaded design' }}</a></p>
+                    @endif
                 </div>
             </div>
 
