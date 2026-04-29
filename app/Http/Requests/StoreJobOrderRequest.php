@@ -31,7 +31,6 @@ class StoreJobOrderRequest extends FormRequest
             'total_copies' => ['required', 'integer', 'min:1'],
             'standard_sheet_size' => ['required', 'in:demy,crown,double_crown,royal'],
             'colors' => ['required', 'integer', 'min:1', 'max:4'],
-            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
             'estimated_material_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_other_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_unit_price' => ['nullable', 'numeric', 'min:0'],

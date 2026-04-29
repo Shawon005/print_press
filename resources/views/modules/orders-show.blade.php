@@ -62,8 +62,7 @@
                         <div class="flex justify-between gap-4 border-b border-slate-100 pb-2"><dt class="font-semibold text-slate-500">Custom Size</dt><dd class="text-right font-semibold text-slate-900">{{ ($record->custom_width && $record->custom_height) ? $record->custom_width . ' x ' . $record->custom_height . ' in' : '-' }}</dd></div>
                         <div class="flex justify-between gap-4 border-b border-slate-100 pb-2"><dt class="font-semibold text-slate-500">Total Copies</dt><dd class="text-right font-semibold text-slate-900">{{ number_format((float) $record->total_copies) }}</dd></div>
                         <div class="flex justify-between gap-4 border-b border-slate-100 pb-2"><dt class="font-semibold text-slate-500">Standard Sheet</dt><dd class="text-right font-semibold text-slate-900">{{ $record->standard_sheet_size }}</dd></div>
-                        <div class="flex justify-between gap-4 border-b border-slate-100 pb-2"><dt class="font-semibold text-slate-500">Colors</dt><dd class="text-right font-semibold text-slate-900">{{ $record->colors }}</dd></div>
-                        <div class="flex justify-between gap-4"><dt class="font-semibold text-slate-500">Printing Style</dt><dd class="text-right font-semibold text-slate-900">{{ str($record->printing_style)->replace('_', ' ')->headline() }}</dd></div>
+                        <div class="flex justify-between gap-4"><dt class="font-semibold text-slate-500">Colors</dt><dd class="text-right font-semibold text-slate-900">{{ $record->colors }}</dd></div>
                     </dl>
                 </article>
             </section>

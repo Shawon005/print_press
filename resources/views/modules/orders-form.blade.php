@@ -40,6 +40,15 @@
                         </div>
                         <div x-show="step===2" class="grid gap-5 md:grid-cols-3">
                             <div><label class="mb-2 block text-sm font-semibold">Paper Type</label><select x-model="form.paper_type_id" name="paper_type_id" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required><option value="">Select</option>@foreach($paperTypes as $paperType)<option value="{{ $paperType->id }}" @selected(old('paper_type_id', $record?->paper_type_id) == $paperType->id)>{{ $paperType->name }}</option>@endforeach</select></div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold">Raw Material</label>
+                                <select x-model="form.raw_material_id" name="raw_material_id" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required>
+                                    <option value="">Select</option>
+                                    @foreach($rawMaterials as $rawMaterial)
+                                        <option value="{{ $rawMaterial->id }}" @selected(old('raw_material_id', $record?->raw_material_id) == $rawMaterial->id)>{{ $rawMaterial->name }} ({{ $rawMaterial->width_in }}x{{ $rawMaterial->height_in }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
                             <div><label class="mb-2 block text-sm font-semibold">GSM</label><input type="number" x-model="form.gsm" name="gsm" value="{{ old('gsm', $record?->gsm) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required></div>
                             <div>
                                 <label class="mb-2 block text-sm font-semibold">Ink Type</label>
@@ -54,7 +63,6 @@
                             </div>
                             <div><label class="mb-2 block text-sm font-semibold">Pantone Codes</label><input name="pantone_codes" value="{{ old('pantone_codes', $record?->pantone_codes) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
                             <div><label class="mb-2 block text-sm font-semibold">Finish</label><select name="finish_type" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="none" @selected(old('finish_type', $record?->finish_type) === 'none')>None</option><option value="lamination" @selected(old('finish_type', $record?->finish_type) === 'lamination')>Lamination</option><option value="die-cut" @selected(old('finish_type', $record?->finish_type) === 'die-cut')>Die-cut</option><option value="spot-uv" @selected(old('finish_type', $record?->finish_type) === 'spot-uv')>Spot UV</option><option value="varnish" @selected(old('finish_type', $record?->finish_type) === 'varnish')>Varnish</option></select></div>
-                            <div><label class="mb-2 block text-sm font-semibold">Total Pages</label><input type="number" x-model="form.total_pages" name="total_pages" value="{{ old('total_pages', $record?->total_pages) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required></div>
                             <div><label class="mb-2 block text-sm font-semibold">Page Size</label><select x-model="form.page_size" name="page_size" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="A4">A4</option><option value="A5">A5</option><option value="Letter">Letter</option><option value="8.5x11">8.5x11</option><option value="custom">Custom</option></select></div>
                             <div><label class="mb-2 block text-sm font-semibold">Custom Width (in)</label><input type="number" step="0.01" x-model="form.custom_width" name="custom_width" value="{{ old('custom_width', $record?->custom_width) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
                             <div><label class="mb-2 block text-sm font-semibold">Custom Height (in)</label><input type="number" step="0.01" x-model="form.custom_height" name="custom_height" value="{{ old('custom_height', $record?->custom_height) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"></div>
@@ -70,16 +78,18 @@
                                 </select>
                             </div>
                             <div><label class="mb-2 block text-sm font-semibold">Colors</label><input type="number" min="1" max="4" x-model="form.colors" name="colors" value="{{ old('colors', $record?->colors ?? 4) }}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" required></div>
-                            <div><label class="mb-2 block text-sm font-semibold">Printing Style</label><select x-model="form.printing_style" name="printing_style" class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="work_and_turn">Work and Turn</option><option value="work_and_back">Work and Back</option></select></div>
                         </div>
 
                         <div x-show="step===3" class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
                             <h3 class="text-lg font-bold">Calculation Preview</h3>
                             <div class="mt-4 grid gap-3 md:grid-cols-4 text-sm">
+                                <div><p class="text-slate-500">Raw Size</p><p class="font-bold" x-text="calc.sheet_width && calc.sheet_height ? (calc.sheet_width + ' x ' + calc.sheet_height) : '-'"></p></div>
                                 <div><p class="text-slate-500">Pages/Sheet</p><p class="font-bold" x-text="calc.pages_per_sheet ?? '-' "></p></div>
-                                <div><p class="text-slate-500">Raw Sheets</p><p class="font-bold" x-text="calc.raw_sheets ?? '-' "></p></div>
+                                <div><p class="text-slate-500">Raw Sheets Need</p><p class="font-bold" x-text="calc.raw_sheets ?? '-' "></p></div>
                                 <div><p class="text-slate-500">Wastage</p><p class="font-bold" x-text="calc.wastage_percentage ?? '-' "></p></div>
                                 <div><p class="text-slate-500">Total Sheets</p><p class="font-bold" x-text="calc.total_sheets ?? '-' "></p></div>
+                                <div><p class="text-slate-500">Raw Unit Cost</p><p class="font-bold" x-text="calc.raw_material_unit_cost ?? '-' "></p></div>
+                                <div><p class="text-slate-500">Total Raw Cost</p><p class="font-bold" x-text="calc.total_raw_material_cost ?? '-' "></p></div>
                             </div>
                             <p class="mt-3 text-sm font-semibold" x-text="calc.summary || 'Preview will appear automatically.'"></p>
                         </div>
@@ -123,20 +133,19 @@
                     step: 1,
                     steps: ['Customer & Job', 'Paper & Print', 'Live Calculation', 'Financial Terms'],
                     form: {
-                        total_pages: {{ (int) old('total_pages', $record?->total_pages ?? 0) }},
                         page_size: '{{ old('page_size', $record?->page_size ?? 'A4') }}',
                         custom_width: '{{ old('custom_width', $record?->custom_width ?? '') }}',
                         custom_height: '{{ old('custom_height', $record?->custom_height ?? '') }}',
                         total_copies: {{ (int) old('total_copies', $record?->total_copies ?? 0) }},
+                        raw_material_id: '{{ old('raw_material_id', $record?->raw_material_id ?? '') }}',
                         standard_sheet_size: '{{ old('standard_sheet_size', $record?->standard_sheet_size ?? 'demy') }}',
                         colors: {{ (int) old('colors', $record?->colors ?? 4) }},
-                        printing_style: '{{ old('printing_style', $record?->printing_style ?? 'work_and_turn') }}',
                         gsm: {{ (int) old('gsm', $record?->gsm ?? 0) }},
                         paper_type_id: '{{ old('paper_type_id', $record?->paper_type_id ?? '') }}'
                     },
                     calc: {},
                     async preview() {
-                        if (!this.form.total_pages || !this.form.total_copies) return;
+                        if (!this.form.total_copies || !this.form.raw_material_id) return;
                         const response = await fetch("{{ route('orders.calc-preview') }}", {
                             method: 'POST',
                             headers: {

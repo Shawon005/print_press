@@ -748,7 +748,7 @@ class PortalController extends Controller
 
     private function deliveriesData(Tenant $tenant): array
     {
-        $deliveries = Delivery::with('order')->where('tenant_id', $tenant->id)->latest()->get();
+        $deliveries = Delivery::with('jobOrder')->where('tenant_id', $tenant->id)->latest()->get();
 
         return [
             'eyebrow' => 'Transport & Dispatch',
@@ -766,7 +766,7 @@ class PortalController extends Controller
                 'columns' => ['Delivery No', 'Order', 'Delivery Date', 'Vehicle', 'Transport Cost', 'Status'],
                 'rows' => $deliveries->map(fn (Delivery $delivery) => [
                     $delivery->delivery_number,
-                    $delivery->order?->order_number ?? '-',
+                    $delivery->jobOrder?->job_number ?? ('ID: ' . $delivery->order_id),
                     optional($delivery->delivery_date)->format('M d, Y'),
                     $delivery->vehicle_no,
                     '$' . number_format((float) $delivery->transport_cost, 0),

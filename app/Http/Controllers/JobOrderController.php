@@ -56,7 +56,6 @@ class JobOrderController extends Controller
                 'standard_sheet_size' => $data['standard_sheet_size'],
                 'colors' => $data['colors'],
                 'wastage_per_color' => config('printing.wastage.default_per_color_percent'),
-                'printing_style' => $data['printing_style'],
             ]);
 
             $jobOrder = JobOrder::create(array_merge($data, [
@@ -141,7 +140,6 @@ class JobOrderController extends Controller
             'total_copies' => ['required', 'integer', 'min:1'],
             'standard_sheet_size' => ['required', 'in:demy,crown,double_crown,royal'],
             'colors' => ['required', 'integer', 'min:1', 'max:4'],
-            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
         ]);
 
         return response()->json($this->calculationService->calculate($payload));

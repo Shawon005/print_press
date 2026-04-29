@@ -37,4 +37,9 @@ class Delivery extends Model
     {
         return $this->belongsTo(Order::class);
     }
+
+    public function jobOrder(): BelongsTo
+    {
+        return $this->belongsTo(JobOrder::class, 'order_id');
+    }
 }

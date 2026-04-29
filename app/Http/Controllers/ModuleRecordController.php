@@ -52,6 +52,7 @@ class ModuleRecordController extends Controller
                 'module' => $module,
                 'customers' => Customer::orderBy('company_name')->get(),
                 'paperTypes' => PaperType::orderBy('name')->get(),
+                'rawMaterials' => RawMaterial::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'inkTypes' => InkType::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'standardSheets' => StandardSheet::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'record' => null,
@@ -92,6 +93,7 @@ class ModuleRecordController extends Controller
                 'module' => $module,
                 'customers' => Customer::orderBy('company_name')->get(),
                 'paperTypes' => PaperType::orderBy('name')->get(),
+                'rawMaterials' => RawMaterial::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'inkTypes' => InkType::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'standardSheets' => StandardSheet::where('tenant_id', Tenant::firstOrFail()->id)->orderBy('name')->get(),
                 'record' => $record,
@@ -170,15 +172,15 @@ class ModuleRecordController extends Controller
 
             DB::transaction(function () use ($data, $tenant, $user, $designMeta): void {
                 $calculation = $this->printCalculationService->calculate([
-                    'total_pages' => $data['total_pages'],
+                    'total_pages' => 1,
                     'page_size' => $data['page_size'],
                     'custom_width' => $data['custom_width'] ?? null,
                     'custom_height' => $data['custom_height'] ?? null,
                     'total_copies' => $data['total_copies'],
+                    'raw_material_id' => $data['raw_material_id'],
                     'standard_sheet_size' => $data['standard_sheet_size'],
                     'colors' => $data['colors'],
                     'wastage_per_color' => config('printing.wastage.default_per_color_percent'),
-                    'printing_style' => $data['printing_style'],
                 ]);
 
                 $order = JobOrder::create([
@@ -192,21 +194,21 @@ class ModuleRecordController extends Controller
                     'status' => $data['status'] ?? 'draft',
                     'gsm' => $data['gsm'],
                     'paper_type_id' => $data['paper_type_id'],
+                    'raw_material_id' => $data['raw_material_id'],
                     'ink_type' => $data['ink_type'],
                     'pantone_codes' => $data['pantone_codes'] ?? null,
                     'finish_type' => $data['finish_type'],
-                    'total_pages' => $data['total_pages'],
+                    'total_pages' => 1,
                     'page_size' => $data['page_size'],
                     'custom_width' => $data['custom_width'] ?? null,
                     'custom_height' => $data['custom_height'] ?? null,
                     'total_copies' => $data['total_copies'],
                     'standard_sheet_size' => $data['standard_sheet_size'],
                     'colors' => $data['colors'],
-                    'printing_style' => $data['printing_style'],
-                    'estimated_material_cost' => $data['estimated_material_cost'] ?? 0,
+                    'estimated_material_cost' => $calculation['total_raw_material_cost'],
                     'estimated_other_cost' => $data['estimated_other_cost'] ?? 0,
                     'estimated_plate_cost' => 0,
-                    'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0),
+                    'estimated_total_cost' => (float) $calculation['total_raw_material_cost'] + ($data['estimated_other_cost'] ?? 0),
                     'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
                     'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
                     'design_source' => $data['design_source'] ?? 'customer_provided',
@@ -312,15 +314,15 @@ class ModuleRecordController extends Controller
 
             DB::transaction(function () use ($data, $record, $designMeta): void {
                 $calculation = $this->printCalculationService->calculate([
-                    'total_pages' => $data['total_pages'],
+                    'total_pages' => 1,
                     'page_size' => $data['page_size'],
                     'custom_width' => $data['custom_width'] ?? null,
                     'custom_height' => $data['custom_height'] ?? null,
                     'total_copies' => $data['total_copies'],
+                    'raw_material_id' => $data['raw_material_id'],
                     'standard_sheet_size' => $data['standard_sheet_size'],
                     'colors' => $data['colors'],
                     'wastage_per_color' => config('printing.wastage.default_per_color_percent'),
-                    'printing_style' => $data['printing_style'],
                 ]);
 
                 $record->update([
@@ -332,20 +334,20 @@ class ModuleRecordController extends Controller
                     'status' => $data['status'] ?? $record->status,
                     'gsm' => $data['gsm'],
                     'paper_type_id' => $data['paper_type_id'],
+                    'raw_material_id' => $data['raw_material_id'],
                     'ink_type' => $data['ink_type'],
                     'pantone_codes' => $data['pantone_codes'] ?? null,
                     'finish_type' => $data['finish_type'],
-                    'total_pages' => $data['total_pages'],
+                    'total_pages' => 1,
                     'page_size' => $data['page_size'],
                     'custom_width' => $data['custom_width'] ?? null,
                     'custom_height' => $data['custom_height'] ?? null,
                     'total_copies' => $data['total_copies'],
                     'standard_sheet_size' => $data['standard_sheet_size'],
                     'colors' => $data['colors'],
-                    'printing_style' => $data['printing_style'],
-                    'estimated_material_cost' => $data['estimated_material_cost'] ?? 0,
+                    'estimated_material_cost' => $calculation['total_raw_material_cost'],
                     'estimated_other_cost' => $data['estimated_other_cost'] ?? 0,
-                    'estimated_total_cost' => ($data['estimated_material_cost'] ?? 0) + ($data['estimated_other_cost'] ?? 0) + (float) $record->estimated_plate_cost,
+                    'estimated_total_cost' => (float) $calculation['total_raw_material_cost'] + ($data['estimated_other_cost'] ?? 0) + (float) $record->estimated_plate_cost,
                     'estimated_unit_price' => $data['estimated_unit_price'] ?? 0,
                     'estimated_total_price' => ($data['estimated_unit_price'] ?? 0) * $data['total_copies'],
                     'design_source' => $data['design_source'] ?? $record->design_source,
@@ -584,17 +586,18 @@ class ModuleRecordController extends Controller
     public function previewOrderCalculation(Request $request)
     {
         $payload = $request->validate([
-            'total_pages' => ['required', 'integer', 'min:1'],
             'page_size' => ['required', 'string'],
             'custom_width' => ['nullable', 'numeric', 'min:0.1'],
             'custom_height' => ['nullable', 'numeric', 'min:0.1'],
             'total_copies' => ['required', 'integer', 'min:1'],
+            'raw_material_id' => ['required', 'integer', 'exists:raw_materials,id'],
             'standard_sheet_size' => ['required', 'string', 'max:100'],
             'colors' => ['required', 'integer', 'min:1', 'max:4'],
-            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
         ]);
 
-        return response()->json($this->printCalculationService->calculate($payload));
+        $calc = $this->printCalculationService->calculate(array_merge($payload, ['total_pages' => 1]));
+
+        return response()->json($calc);
     }
 
     public function invoiceJobOrderSummary(int $id): JsonResponse
@@ -687,17 +690,16 @@ class ModuleRecordController extends Controller
             'due_date' => ['nullable', 'date', 'after_or_equal:order_date'],
             'gsm' => ['required', 'integer', 'min:40', 'max:1000'],
             'paper_type_id' => ['required', 'exists:paper_types,id'],
+            'raw_material_id' => ['required', 'exists:raw_materials,id'],
             'ink_type' => ['required', 'string', 'max:50'],
             'pantone_codes' => ['nullable', 'string', 'max:255'],
             'finish_type' => ['required', 'string', 'max:50'],
-            'total_pages' => ['required', 'integer', 'min:1'],
             'page_size' => ['required', 'string', 'max:50'],
             'custom_width' => ['nullable', 'numeric', 'min:0.1'],
             'custom_height' => ['nullable', 'numeric', 'min:0.1'],
             'total_copies' => ['required', 'integer', 'min:1'],
             'standard_sheet_size' => ['required', 'string', 'max:100'],
             'colors' => ['required', 'integer', 'min:1', 'max:4'],
-            'printing_style' => ['required', 'in:work_and_turn,work_and_back'],
             'estimated_material_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_other_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_unit_price' => ['nullable', 'numeric', 'min:0'],
@@ -862,7 +864,7 @@ class ModuleRecordController extends Controller
 
     private function deliveryPrintPayload(int $id, int $tenantId): array
     {
-        $delivery = Delivery::with(['order.customer'])
+        $delivery = Delivery::with(['jobOrder.customer'])
             ->where('tenant_id', $tenantId)
             ->findOrFail($id);
 
@@ -1104,6 +1106,8 @@ class ModuleRecordController extends Controller
                     ['name' => 'current_stock', 'label' => 'Current Stock', 'type' => 'number'],
                     ['name' => 'minimum_stock', 'label' => 'Minimum Stock', 'type' => 'number'],
                     ['name' => 'average_cost', 'label' => 'Average Cost', 'type' => 'number'],
+                    ['name' => 'width_in', 'label' => 'Width (inch)', 'type' => 'number'],
+                    ['name' => 'height_in', 'label' => 'Height (inch)', 'type' => 'number'],
                     ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'inactive' => 'Inactive']],
                 ],
                 'rules' => [
@@ -1114,10 +1118,12 @@ class ModuleRecordController extends Controller
                     'current_stock' => ['required', 'numeric'],
                     'minimum_stock' => ['required', 'numeric'],
                     'average_cost' => ['required', 'numeric'],
+                    'width_in' => ['required', 'numeric', 'min:0.1'],
+                    'height_in' => ['required', 'numeric', 'min:0.1'],
                     'status' => ['required', 'string'],
                 ],
                 'payload' => fn ($data, $tenant) => array_merge($data, ['tenant_id' => $tenant->id]),
-                'export' => fn ($tenant) => array_merge([['Code', 'Name', 'Unit', 'Current Stock', 'Minimum Stock', 'Average Cost', 'Status']], RawMaterial::where('tenant_id', $tenant->id)->get(['code', 'name', 'unit', 'current_stock', 'minimum_stock', 'average_cost', 'status'])->map(fn ($m) => [$m->code, $m->name, $m->unit, $m->current_stock, $m->minimum_stock, $m->average_cost, $m->status])->all()),
+                'export' => fn ($tenant) => array_merge([['Code', 'Name', 'Unit', 'Current Stock', 'Minimum Stock', 'Average Cost', 'Width(in)', 'Height(in)', 'Status']], RawMaterial::where('tenant_id', $tenant->id)->get(['code', 'name', 'unit', 'current_stock', 'minimum_stock', 'average_cost', 'width_in', 'height_in', 'status'])->map(fn ($m) => [$m->code, $m->name, $m->unit, $m->current_stock, $m->minimum_stock, $m->average_cost, $m->width_in, $m->height_in, $m->status])->all()),
             ],
             'warehouses' => [
                 'title' => 'Add Warehouse',
@@ -1429,7 +1435,7 @@ class ModuleRecordController extends Controller
                 'success' => 'Delivery created successfully.',
                 'fields' => [
                     ['name' => 'delivery_number', 'label' => 'Delivery Number', 'type' => 'text'],
-                    ['name' => 'order_id', 'label' => 'Order', 'type' => 'select', 'source' => 'orders'],
+                    ['name' => 'order_id', 'label' => 'Job Order ID', 'type' => 'select', 'source' => 'job_orders'],
                     ['name' => 'delivery_date', 'label' => 'Delivery Date', 'type' => 'date'],
                     ['name' => 'assigned_to', 'label' => 'Assigned To', 'type' => 'select', 'source' => 'users'],
                     ['name' => 'vehicle_no', 'label' => 'Vehicle No', 'type' => 'text'],
@@ -1438,7 +1444,7 @@ class ModuleRecordController extends Controller
                 ],
                 'rules' => [
                     'delivery_number' => ['required', 'string', 'max:255'],
-                    'order_id' => ['required', 'integer'],
+                    'order_id' => ['required', 'integer', 'exists:job_orders,id'],
                     'delivery_date' => ['nullable', 'date'],
                     'assigned_to' => ['nullable', 'integer'],
                     'vehicle_no' => ['nullable', 'string', 'max:255'],

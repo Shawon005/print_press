@@ -21,6 +21,8 @@ class RawMaterial extends Model
         'current_stock',
         'minimum_stock',
         'average_cost',
+        'width_in',
+        'height_in',
         'status',
     ];
 

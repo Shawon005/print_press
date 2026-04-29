@@ -69,12 +69,6 @@
                         </select>
                     </div>
                     <div><label class="text-sm font-medium">Colors (1-4)</label><input type="number" min="1" max="4" name="colors" x-model="form.colors" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" required></div>
-                    <div>
-                        <label class="text-sm font-medium">Printing Style</label>
-                        <select name="printing_style" x-model="form.printing_style" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                            <option value="work_and_turn">Work and Turn</option><option value="work_and_back">Work and Back</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div x-show="step === 3" class="rounded-lg border border-blue-200 bg-blue-50 p-5">
@@ -122,7 +116,6 @@
                     total_copies: 0,
                     standard_sheet_size: 'demy',
                     colors: 4,
-                    printing_style: 'work_and_turn',
                     gsm: 0,
                     paper_type_id: ''
                 },

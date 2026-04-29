@@ -4,7 +4,7 @@
 <body>
 <h2>Delivery Challan</h2>
 <p><strong>Delivery No:</strong> {{ $delivery->delivery_number }}</p>
-<p><strong>Order:</strong> {{ $delivery->order?->order_number }} | <strong>Customer:</strong> {{ $delivery->order?->customer?->company_name }}</p>
+<p><strong>Job Order:</strong> {{ $delivery->jobOrder?->job_number ?? ('ID: ' . $delivery->order_id) }} | <strong>Customer:</strong> {{ $delivery->jobOrder?->customer?->company_name }}</p>
 <p><strong>Date:</strong> {{ optional($delivery->delivery_date)->format('d M Y') }} | <strong>Status:</strong> {{ str($delivery->status)->headline() }}</p>
 <table>
 <tr><th>Vehicle</th><th>Transport Cost</th><th>Received By</th></tr>

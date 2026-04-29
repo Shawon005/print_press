@@ -18,14 +18,13 @@
 <p><strong>Customer:</strong> {{ $order->customer?->company_name }}</p>
 <p><strong>Status:</strong> {{ str($order->status)->headline() }}</p>
 <table>
-    <tr><th>Paper</th><th>GSM</th><th>Page Size</th><th>Copies</th><th>Colors</th><th>Printing Style</th></tr>
+    <tr><th>Paper</th><th>GSM</th><th>Page Size</th><th>Copies</th><th>Colors</th></tr>
     <tr>
         <td>{{ $order->paperType?->name }}</td>
         <td>{{ $order->gsm }}</td>
         <td>{{ $order->page_size }}</td>
         <td>{{ number_format($order->total_copies) }}</td>
         <td>{{ $order->colors }}</td>
-        <td>{{ str($order->printing_style)->headline() }}</td>
     </tr>
 </table>
 @php($calc = $order->calculations->sortByDesc('computed_at')->first())

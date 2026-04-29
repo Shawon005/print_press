@@ -6,6 +6,7 @@ use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\RawMaterial;
 
 class JobOrder extends Model
 {
@@ -22,6 +23,7 @@ class JobOrder extends Model
         'status',
         'gsm',
         'paper_type_id',
+        'raw_material_id',
         'ink_type',
         'pantone_codes',
         'finish_type',
@@ -75,6 +77,11 @@ class JobOrder extends Model
     public function paperType(): BelongsTo
     {
         return $this->belongsTo(PaperType::class);
+    }
+
+    public function rawMaterial(): BelongsTo
+    {
+        return $this->belongsTo(RawMaterial::class);
     }
 
     public function calculation(): HasMany
