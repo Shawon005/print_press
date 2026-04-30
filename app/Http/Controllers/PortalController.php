@@ -43,6 +43,39 @@ class PortalController extends Controller
         return $this->renderPage($page, $request);
     }
 
+    public function customerReport(Customer $customer): View
+    {
+        $tenant = Tenant::firstOrFail();
+        abort_unless((int) $customer->tenant_id === (int) $tenant->id, 404);
+
+        $quotations = Quotation::where('tenant_id', $tenant->id)
+            ->where('customer_id', $customer->id)
+            ->latest()
+            ->get();
+        $orders = JobOrder::where('tenant_id', $tenant->id)
+            ->where('customer_id', $customer->id)
+            ->latest()
+            ->get();
+        $invoices = Invoice::where('tenant_id', $tenant->id)
+            ->where('customer_id', $customer->id)
+            ->latest()
+            ->get();
+
+        return view('reports.customer', [
+            'customer' => $customer,
+            'quotations' => $quotations,
+            'orders' => $orders,
+            'invoices' => $invoices,
+            'totals' => [
+                'quotation_total' => (float) $quotations->sum('total'),
+                'order_total' => (float) $orders->sum('estimated_total_price'),
+                'invoice_total' => (float) $invoices->sum('total'),
+                'paid_total' => (float) $invoices->sum('paid_amount'),
+                'due_total' => (float) $invoices->sum('due_amount'),
+            ],
+        ]);
+    }
+
     public function updateCompanyProfile(Request $request): RedirectResponse
     {
         $tenant = Tenant::firstOrFail();
@@ -861,7 +894,9 @@ class PortalController extends Controller
         $sales = (float) $revenueSeries->sum();
         $expenses = (float) $expenseSeries->sum();
 
-        $customerRows = $invoiceRows
+        $customerRows = Invoice::where('tenant_id', $tenant->id)
+            ->with('customer:id,company_name')
+            ->get(['customer_id', 'invoice_date', 'total', 'paid_amount', 'due_amount'])
             ->groupBy('customer_id')
             ->map(function ($group, $customerId) {
                 $first = $group->first();
@@ -874,8 +909,10 @@ class PortalController extends Controller
                     'customer' => $customerName ?: 'Unknown',
                     'invoices' => (int) $group->count(),
                     'revenue' => (float) $group->sum('total'),
+                    'paid' => (float) $group->sum('paid_amount'),
                     'due' => (float) $group->sum('due_amount'),
                     'last_invoice' => optional($group->pluck('invoice_date')->filter()->sort()->last())->format('M d, Y'),
+                    'customer_id' => (int) $customerId,
                 ];
             })
             ->sortByDesc('revenue')
@@ -919,14 +956,19 @@ class PortalController extends Controller
             ],
             'secondary_table' => [
                 'title' => 'Top Customer Report',
-                'columns' => ['Customer', 'Invoices', 'Revenue', 'Due', 'Last Invoice'],
+                'columns' => ['Customer', 'Invoices', 'Revenue', 'Paid', 'Due', 'Last Invoice', 'Action'],
                 'rows' => $customerRows->map(fn (array $row) => [
                     $row['customer'],
                     (string) $row['invoices'],
                     '$' . number_format($row['revenue'], 2),
+                    '$' . number_format($row['paid'], 2),
                     '$' . number_format($row['due'], 2),
                     $row['last_invoice'] ?: '-',
+                    'View Report',
                 ])->all(),
+                'action_urls' => $customerRows->map(
+                    fn (array $row) => $row['customer_id'] > 0 ? route('reports.customer', $row['customer_id']) : null
+                )->all(),
                 'is_report' => true,
             ],
             'side_panel' => [

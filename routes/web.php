@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/orders/calc-preview', [ModuleRecordController::class, 'previewOrderCalculation'])->name('orders.calc-preview');
     Route::get('/invoices/job-orders/{id}/summary', [ModuleRecordController::class, 'invoiceJobOrderSummary'])->name('invoices.job-orders.summary');
     Route::get('/modules/{module}/export', [ModuleRecordController::class, 'export'])->name('modules.export');
+    Route::get('/reports/customers/{customer}', [PortalController::class, 'customerReport'])->name('reports.customer');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
     Route::get('/{page}', [PortalController::class, 'show'])->name('portal.page');

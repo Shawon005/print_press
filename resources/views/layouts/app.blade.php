@@ -5,7 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Printing Press ERP' }}</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @php($hasViteBuild = file_exists(public_path('build/manifest.json')))
+    @if ($hasViteBuild)
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        <script src="https://cdn.tailwindcss.com"></script>
+    @endif
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900">
@@ -16,13 +21,13 @@
             <p class="text-sm text-slate-500">Dhaka Wholesale Workflow</p>
         </div>
         <nav class="space-y-2 text-sm font-medium">
-            <a href="{{ route('job-orders.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Job Orders</a>
-            <a href="{{ route('inventory.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Inventory</a>
-            <a href="{{ route('financials.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Financials</a>
-            <a href="{{ route('purchase-orders.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Purchase Orders</a>
-            <a href="{{ route('delivery-challans.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Delivery Challans</a>
-            <a href="{{ route('ctps.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">CTP Plates</a>
-            <a href="{{ route('reports.index') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Reports</a>
+            <a href="{{ route('portal.page', 'orders') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Job Orders</a>
+            <a href="{{ route('portal.page', 'raw-materials') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Inventory</a>
+            <a href="{{ route('portal.page', 'invoices') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Financials</a>
+            <a href="{{ route('portal.page', 'purchases') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Purchase Orders</a>
+            <a href="{{ route('portal.page', 'deliveries') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Delivery Challans</a>
+            <a href="{{ route('portal.page', 'printing') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">CTP Plates</a>
+            <a href="{{ route('portal.page', 'reports') }}" class="block rounded-lg px-3 py-2 hover:bg-slate-100">Reports</a>
         </nav>
     </aside>
 
