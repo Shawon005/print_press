@@ -280,13 +280,13 @@
                                 </article>
                             @endif
 
-                            @if ($currentPage === 'printing' && !empty($pageData['printing_calculator']))
+                            @if ($currentPage === 'printing-rectangle' && !empty($pageData['printing_calculator']))
                                 <article class="surface-card p-6">
                                     <div class="mb-6">
-                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Sheet Calculator</p>
+                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Rectangle System</p>
                                         <h3 class="text-2xl font-black tracking-tight text-slate-900">Page Fit by Orientation</h3>
                                     </div>
-                                    <form method="GET" action="{{ route('portal.page', 'printing') }}" class="grid gap-4 md:grid-cols-4">
+                                    <form method="GET" action="{{ route('portal.page', $currentPage) }}" class="grid gap-4 md:grid-cols-4">
                                         <label class="block">
                                             <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Print Width</span>
                                             <input type="number" step="0.01" min="0" name="print_width" value="{{ $pageData['printing_calculator']['inputs']['print_width'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
@@ -319,16 +319,11 @@
                                                 $sheetInputHeight = max((float) ($pageData['printing_calculator']['inputs']['sheet_height'] ?? 0), 0.0);
                                                 $printCellWidth = max((float) ($layout['cell_width'] ?? 0), 0.0);
                                                 $printCellHeight = max((float) ($layout['cell_height'] ?? 0), 0.0);
-
-                                                $scale = ($sheetInputWidth > 0 && $sheetInputHeight > 0)
-                                                    ? min($svgWidth / $sheetInputWidth, $svgHeight / $sheetInputHeight)
-                                                    : 0;
-
+                                                $scale = ($sheetInputWidth > 0 && $sheetInputHeight > 0) ? min($svgWidth / $sheetInputWidth, $svgHeight / $sheetInputHeight) : 0;
                                                 $drawSheetWidth = $scale > 0 ? $sheetInputWidth * $scale : $svgWidth;
                                                 $drawSheetHeight = $scale > 0 ? $sheetInputHeight * $scale : $svgHeight;
                                                 $offsetX = ($svgWidth - $drawSheetWidth) / 2;
                                                 $offsetY = ($svgHeight - $drawSheetHeight) / 2;
-
                                                 $cellWidth = $printCellWidth * $scale;
                                                 $cellHeight = $printCellHeight * $scale;
                                                 $usedWidth = $cols > 0 ? $cellWidth * $cols : 0;
@@ -350,7 +345,6 @@
                                                                 <rect x="{{ $offsetX + ($c * $cellWidth) + 0.8 }}" y="{{ $offsetY + ($r * $cellHeight) + 0.8 }}" width="{{ max($cellWidth - 1.6, 0) }}" height="{{ max($cellHeight - 1.6, 0) }}" fill="{{ $orientationKey === 'vertical' ? '#dbeafe' : '#dcfce7' }}" stroke="{{ $orientationKey === 'vertical' ? '#2563eb' : '#16a34a' }}" stroke-width="0.8" />
                                                             @endfor
                                                         @endfor
-
                                                         @if ($usedWidth < $drawSheetWidth)
                                                             <rect x="{{ $offsetX + $usedWidth }}" y="{{ $offsetY }}" width="{{ $drawSheetWidth - $usedWidth }}" height="{{ $drawSheetHeight }}" fill="#fee2e2" opacity="0.75" />
                                                         @endif
@@ -364,6 +358,105 @@
                                                 <p class="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-700">Red shaded area = wastage</p>
                                             </div>
                                         @endforeach
+                                    </div>
+                                </article>
+                            @endif
+
+                            @if ($currentPage === 'printing' && !empty($pageData['printing_calculator']))
+                                <article class="surface-card p-6">
+                                    <div class="mb-6">
+                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Die-Cut</p>
+                                        <h3 class="text-2xl font-black tracking-tight text-slate-900">Real Shape Planner</h3>
+                                        <p class="mt-2 text-sm text-slate-500">Auto flat width model: <strong>(2 × body width) + (2 × side flap) + glue flap</strong></p>
+                                    </div>
+                                    <form id="die-generate-form" class="grid gap-4 md:grid-cols-4">
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Width (in)</span>
+                                            <input type="number" step="0.01" min="0.01" name="body_width_in" value="2.36" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Height (in)</span>
+                                            <input type="number" step="0.01" min="0.01" name="body_height_in" value="3.54" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Top Flap (in)</span>
+                                            <input type="number" step="0.01" min="0" name="top_flap_in" value="0.79" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bottom Flap (in)</span>
+                                            <input type="number" step="0.01" min="0" name="bottom_flap_in" value="0.79" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Side Flap (in)</span>
+                                            <input type="number" step="0.01" min="0" name="side_flap_in" value="0.63" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Glue Flap (in)</span>
+                                            <input type="number" step="0.01" min="0" name="glue_flap_in" value="0.47" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bleed (in)</span>
+                                            <input type="number" step="0.01" min="0" name="bleed_in" value="0.12" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Gap (in)</span>
+                                            <input type="number" step="0.01" min="0" name="gap_in" value="0.10" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width (in)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_width_in" value="30" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height (in)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_height_in" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </label>
+                                        <div class="md:col-span-2 flex items-end gap-3">
+                                            <button type="button" id="btn-generate-die" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Generate Shape</button>
+                                            <button type="button" id="btn-calculate-layout" class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20">Calculate Nesting</button>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Upload SVG Die-Line</label>
+                                            <input type="file" id="die-svg-file" accept=".svg" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                        </div>
+                                    </form>
+                                    <div class="mt-6 grid gap-6 lg:grid-cols-3">
+                                        <div class="rounded-2xl border border-slate-200 p-4 lg:col-span-2">
+                                            <div id="die-konva-stage" class="h-[440px] w-full rounded-xl border border-slate-300 bg-white"></div>
+                                            <p class="mt-2 text-xs text-slate-500">Manual tools: drag objects directly, press <strong>R</strong> to rotate selected, <strong>D</strong> to duplicate selected.</p>
+                                        </div>
+                                        <div class="rounded-2xl border border-slate-200 p-4">
+                                            <h4 class="text-lg font-bold text-slate-900">Nesting Output</h4>
+                                            <dl class="mt-3 space-y-2 text-sm text-slate-700">
+                                                <div class="flex justify-between"><dt>Boxes/Sheet</dt><dd id="die-box-count">-</dd></div>
+                                                <div class="flex justify-between"><dt>Rendered Boxes</dt><dd id="die-rendered-count">-</dd></div>
+                                                <div class="flex justify-between"><dt>Used Area</dt><dd id="die-used-area">-</dd></div>
+                                                <div class="flex justify-between"><dt>Wastage Area</dt><dd id="die-wastage-area">-</dd></div>
+                                                <div class="flex justify-between"><dt>Wastage %</dt><dd id="die-wastage-percent">-</dd></div>
+                                                <div class="flex justify-between"><dt>Layout Mode</dt><dd id="die-layout-mode">-</dd></div>
+                                            </dl>
+                                            <div class="mt-4 flex flex-col gap-2">
+                                                <a id="die-export-svg" href="#" target="_blank" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700">Export SVG</a>
+                                                <a id="die-export-pdf" href="#" target="_blank" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700">Export PDF</a>
+                                            </div>
+                                            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                                                <table class="min-w-full text-xs">
+                                                    <thead class="bg-slate-100 text-slate-600">
+                                                        <tr>
+                                                            <th class="px-2 py-2 text-left">Metric</th>
+                                                            <th class="px-2 py-2 text-left">Value</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="die-metrics-table-body" class="bg-white text-slate-700">
+                                                        <tr><td class="px-2 py-2">Boxes/Sheet</td><td class="px-2 py-2">-</td></tr>
+                                                        <tr><td class="px-2 py-2">Rendered Boxes</td><td class="px-2 py-2">-</td></tr>
+                                                        <tr><td class="px-2 py-2">Used Area</td><td class="px-2 py-2">-</td></tr>
+                                                        <tr><td class="px-2 py-2">Wastage Area</td><td class="px-2 py-2">-</td></tr>
+                                                        <tr><td class="px-2 py-2">Wastage %</td><td class="px-2 py-2">-</td></tr>
+                                                        <tr><td class="px-2 py-2">Layout Mode</td><td class="px-2 py-2">-</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     </div>
                                 </article>
                             @endif
@@ -629,6 +722,164 @@
                                     }
                                 }
                             }
+                        }
+                    });
+                });
+            </script>
+        @endif
+        @if ($currentPage === 'printing' && !empty($pageData['printing_calculator']))
+            <script src="https://cdn.jsdelivr.net/npm/konva@9/konva.min.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const api = @json($pageData['printing_calculator']['api']);
+                    const csrf = '{{ csrf_token() }}';
+                    let activeShapeId = null;
+                    let selectedNode = null;
+                    const stageWrap = document.getElementById('die-konva-stage');
+                    if (!stageWrap) return;
+
+                    const stage = new Konva.Stage({ container: 'die-konva-stage', width: stageWrap.clientWidth, height: 440 });
+                    const layer = new Konva.Layer();
+                    const tr = new Konva.Transformer({ rotateEnabled: true, enabledAnchors: [] });
+                    layer.add(tr);
+                    stage.add(layer);
+
+                    function pointsToFlat(points) {
+                        return points.flatMap(p => [p.x, p.y]);
+                    }
+
+                    function drawPlacements(layout) {
+                        layer.destroyChildren();
+                        layer.add(tr);
+                        const sheetW = Number(layout.sheet_width_mm);
+                        const sheetH = Number(layout.sheet_height_mm);
+                        const pad = 12;
+                        const scale = Math.min((stage.width() - (pad * 2)) / sheetW, (stage.height() - (pad * 2)) / sheetH);
+                        const sheet = new Konva.Rect({
+                            x: pad,
+                            y: pad,
+                            width: sheetW * scale,
+                            height: sheetH * scale,
+                            fill: '#fee2e2',
+                            stroke: '#b91c1c',
+                            strokeWidth: 1
+                        });
+                        layer.add(sheet);
+
+                        let rendered = 0;
+                        (layout.placements_json || []).forEach((p) => {
+                            const pts = (p.points || []).map(pt => ({ x: pad + pt.x * scale, y: pad + pt.y * scale }));
+                            const poly = new Konva.Line({
+                                points: pointsToFlat(pts),
+                                fill: '#dbeafe',
+                                stroke: '#2563eb',
+                                strokeWidth: 1.3,
+                                closed: true,
+                                draggable: true
+                            });
+                            poly.on('click', function() { selectedNode = poly; tr.nodes([poly]); });
+                            layer.add(poly);
+                            rendered += 1;
+                        });
+                        const renderedEl = document.getElementById('die-rendered-count');
+                        if (renderedEl) renderedEl.textContent = String(rendered);
+                        const tbody = document.getElementById('die-metrics-table-body');
+                        if (tbody) {
+                            const used = Number(layout.used_area_mm2).toFixed(2) + ' mm²';
+                            const wastage = Number(layout.wastage_area_mm2).toFixed(2) + ' mm²';
+                            const wastagePct = Number(layout.wastage_percent).toFixed(2) + '%';
+                            tbody.innerHTML = '' +
+                                '<tr><td class="px-2 py-2">Boxes/Sheet</td><td class="px-2 py-2">' + layout.box_count + '</td></tr>' +
+                                '<tr><td class="px-2 py-2">Rendered Boxes</td><td class="px-2 py-2">' + rendered + '</td></tr>' +
+                                '<tr><td class="px-2 py-2">Used Area</td><td class="px-2 py-2">' + used + '</td></tr>' +
+                                '<tr><td class="px-2 py-2">Wastage Area</td><td class="px-2 py-2">' + wastage + '</td></tr>' +
+                                '<tr><td class="px-2 py-2">Wastage %</td><td class="px-2 py-2">' + wastagePct + '</td></tr>' +
+                                '<tr><td class="px-2 py-2">Layout Mode</td><td class="px-2 py-2">' + layout.layout_mode + '</td></tr>';
+                        }
+                        layer.draw();
+                    }
+
+                    async function post(url, body, isForm = false) {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: isForm ? { 'X-CSRF-TOKEN': csrf } : { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+                            body: isForm ? body : JSON.stringify(body),
+                        });
+                        if (!response.ok) throw new Error('Request failed');
+                        return response.json();
+                    }
+
+                    document.getElementById('btn-generate-die').addEventListener('click', async function () {
+                        const fd = new FormData(document.getElementById('die-generate-form'));
+                        const fileInput = document.getElementById('die-svg-file');
+                        if (fileInput.files.length > 0) {
+                            const uploadData = new FormData();
+                            uploadData.append('die_svg', fileInput.files[0]);
+                            uploadData.append('name', 'Uploaded Die');
+                            const upload = await post(api.upload_svg, uploadData, true);
+                            activeShapeId = upload.shape.id;
+                            return;
+                        }
+                        const payload = Object.fromEntries(fd.entries());
+                        const res = await post(api.generate_shape, payload);
+                        activeShapeId = res.shape.id;
+                    });
+
+                    document.getElementById('btn-calculate-layout').addEventListener('click', async function () {
+                        if (!activeShapeId) return alert('Generate or upload a die shape first.');
+                        const fd = new FormData(document.getElementById('die-generate-form'));
+                        const payload = {
+                            die_shape_id: activeShapeId,
+                            sheet_width_in: Number(fd.get('sheet_width_in')),
+                            sheet_height_in: Number(fd.get('sheet_height_in')),
+                            gap_in: Number(fd.get('gap_in')),
+                            allow_mirror: true
+                        };
+                        const res = await post(api.calculate_layout, payload);
+                        const l = res.layout;
+                        document.getElementById('die-box-count').textContent = l.box_count;
+                        document.getElementById('die-used-area').textContent = Number(l.used_area_mm2).toFixed(2) + ' mm²';
+                        document.getElementById('die-wastage-area').textContent = Number(l.wastage_area_mm2).toFixed(2) + ' mm²';
+                        document.getElementById('die-wastage-percent').textContent = Number(l.wastage_percent).toFixed(2) + '%';
+                        document.getElementById('die-layout-mode').textContent = l.layout_mode;
+                        document.getElementById('die-export-svg').href = res.export_svg_url;
+                        document.getElementById('die-export-pdf').href = res.export_pdf_url;
+                        drawPlacements(l);
+                    });
+
+                    document.addEventListener('keydown', function (e) {
+                        if (!selectedNode) return;
+                        if (e.key.toLowerCase() === 'r') {
+                            const pts = selectedNode.points();
+                            if (!pts || pts.length < 6) return;
+                            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                            for (let i = 0; i < pts.length; i += 2) {
+                                const x = pts[i];
+                                const y = pts[i + 1];
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                            const cx = (minX + maxX) / 2;
+                            const cy = (minY + maxY) / 2;
+                            const rotated = [];
+                            for (let i = 0; i < pts.length; i += 2) {
+                                const x = pts[i];
+                                const y = pts[i + 1];
+                                const rx = cx - (y - cy);
+                                const ry = cy + (x - cx);
+                                rotated.push(rx, ry);
+                            }
+                            selectedNode.points(rotated);
+                            selectedNode.rotation(0);
+                            layer.draw();
+                        }
+                        if (e.key.toLowerCase() === 'd') {
+                            const clone = selectedNode.clone({ x: selectedNode.x() + 10, y: selectedNode.y() + 10 });
+                            clone.on('click', function() { selectedNode = clone; tr.nodes([clone]); });
+                            layer.add(clone);
+                            layer.draw();
                         }
                     });
                 });

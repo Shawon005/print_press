@@ -189,7 +189,8 @@ class PortalController extends Controller
             'expenses' => ['label' => 'Expenses', 'title' => 'Operating cost control', 'icon' => 'wallet'],
             'deliveries' => ['label' => 'Deliveries', 'title' => 'Dispatch, routes, and proof of delivery', 'icon' => 'truck'],
             'reports' => ['label' => 'Reports', 'title' => 'Analytics, due reports, and profitability', 'icon' => 'chart'],
-            'printing' => ['label' => 'Printing', 'title' => 'Sheet layout and orientation calculator', 'icon' => 'printer'],
+            'printing' => ['label' => 'Printing', 'title' => 'Die-cut and rectangle planning', 'icon' => 'printer'],
+            'printing-rectangle' => ['label' => 'Rectangle', 'title' => 'Rectangle fit calculator and layout preview', 'icon' => 'printer'],
             'users-roles' => ['label' => 'Users & Roles', 'title' => 'Tenant access and permissions', 'icon' => 'shield'],
             'settings' => ['label' => 'Settings', 'title' => 'Tenant configuration and business profile', 'icon' => 'settings'],
             'subscription' => ['label' => 'Subscription', 'title' => 'Plans, usage, and billing', 'icon' => 'spark'],
@@ -213,6 +214,7 @@ class PortalController extends Controller
             'deliveries' => $this->deliveriesData($tenant),
             'reports' => $this->reportsData($tenant, $request),
             'printing' => $this->printingData($request),
+            'printing-rectangle' => $this->printingRectangleData($request),
             'users-roles' => $this->usersRolesData($tenant),
             'settings' => $this->settingsData($tenant),
             'subscription' => $this->subscriptionData($tenant),
@@ -229,7 +231,8 @@ class PortalController extends Controller
                 : match ($page) {
                     'dashboard' => ['label' => 'Create Quotation', 'url' => route('modules.create', 'quotations')],
                     'reports' => ['label' => 'Open Orders', 'url' => route('portal.page', 'orders')],
-                    'printing' => ['label' => 'Open Settings', 'url' => route('portal.page', 'settings')],
+                    'printing' => ['label' => 'Open Rectangle Page', 'url' => route('portal.page', 'printing-rectangle')],
+                    'printing-rectangle' => ['label' => 'Open Die-Cut Page', 'url' => route('portal.page', 'printing')],
                     'users-roles' => ['label' => 'Add User', 'url' => route('modules.create', 'users')],
                     'settings' => ['label' => 'Add Paper Type', 'url' => route('modules.create', 'paper-types')],
                     'subscription' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
@@ -239,6 +242,7 @@ class PortalController extends Controller
                 'dashboard' => ['label' => 'View Reports', 'url' => route('portal.page', 'reports')],
                 'reports' => ['label' => 'Export Reports', 'url' => route('modules.export', 'invoices')],
                 'printing' => null,
+                'printing-rectangle' => null,
                 'users-roles' => ['label' => 'Add Role', 'url' => route('modules.create', 'roles')],
                 'settings' => ['label' => 'Add Ink Type', 'url' => route('modules.create', 'ink-types')],
                 'subscription' => ['label' => 'Back to Dashboard', 'url' => route('portal.home')],
@@ -246,6 +250,7 @@ class PortalController extends Controller
             },
             'export_url' => match ($page) {
                 'printing' => null,
+                'printing-rectangle' => null,
                 'dashboard' => route('modules.export', 'orders'),
                 'users-roles' => route('modules.export', 'customers'),
                 'settings' => route('modules.export', 'warehouses'),
@@ -280,9 +285,9 @@ class PortalController extends Controller
 
         return [
             'eyebrow' => 'Print Planning',
-            'headline' => 'Calculate how many print pages fit on one main sheet in vertical and horizontal orientation.',
-            'description' => 'Enter page and sheet size, then compare both orientations with a visual layout.',
-            'actions' => ['Calculate Layout', 'Compare Orientation'],
+            'headline' => 'Die-cut shape nesting with realistic sheet usage and wastage analysis.',
+            'description' => 'Generate or upload die-lines, then test normal, rotated, and interlocked nesting patterns.',
+            'actions' => ['Generate Die Shape', 'Calculate Nesting'],
             'stats' => [
                 ['label' => 'Vertical Fit', 'value' => (string) $verticalTotal, 'note' => $verticalColumns . ' columns × ' . $verticalRows . ' rows'],
                 ['label' => 'Horizontal Fit', 'value' => (string) $horizontalTotal, 'note' => $horizontalColumns . ' columns × ' . $horizontalRows . ' rows'],
@@ -290,6 +295,11 @@ class PortalController extends Controller
                 ['label' => 'Sheet Size', 'value' => rtrim(rtrim(number_format($sheetWidth, 2, '.', ''), '0'), '.') . ' × ' . rtrim(rtrim(number_format($sheetHeight, 2, '.', ''), '0'), '.'), 'note' => 'input main sheet dimensions'],
             ],
             'printing_calculator' => [
+                'api' => [
+                    'generate_shape' => route('printing.die-shapes.generate'),
+                    'upload_svg' => route('printing.die-shapes.upload-svg'),
+                    'calculate_layout' => route('printing.die-layouts.calculate'),
+                ],
                 'inputs' => [
                     'print_width' => $printWidth,
                     'print_height' => $printHeight,
@@ -333,6 +343,16 @@ class PortalController extends Controller
                 ],
             ],
         ];
+    }
+
+    private function printingRectangleData(?Request $request = null): array
+    {
+        $data = $this->printingData($request);
+        $data['headline'] = 'Calculate rectangle-based fit with visual orientation drawing.';
+        $data['description'] = 'Use this page for classic page/sheet fit and wastage comparison.';
+        $data['actions'] = ['Calculate Layout', 'Compare Orientation'];
+
+        return $data;
     }
 
     private function primaryActionLabel(string $page): string

@@ -17,8 +17,8 @@
                     <div class="mt-8 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-[26px] bg-white/75 p-5 shadow-sm">
                             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Demo Login</p>
-                            <p class="mt-3 text-base font-bold text-slate-900">owner@printflow.test</p>
-                            <p class="mt-1 text-sm text-slate-500">Password: `password`</p>
+                            <p class="mt-3 text-base font-bold text-slate-900">press-admin@example.com</p>
+                            <p class="mt-1 text-sm text-slate-500">Password: `12345`</p>
                         </div>
                         <div class="rounded-[26px] bg-white/75 p-5 shadow-sm">
                             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Modules</p>
@@ -36,7 +36,7 @@
                             @csrf
                             <div>
                                 <label for="email" class="mb-2 block text-sm font-semibold text-slate-700">Email</label>
-                                <input id="email" name="email" type="email" value="{{ old('email', 'owner@printflow.test') }}" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
+                                <input id="email" name="email" type="email" value="{{ old('email', 'press-admin@example.com') }}" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
                                 @error('email')
                                     <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -44,7 +44,10 @@
 
                             <div>
                                 <label for="password" class="mb-2 block text-sm font-semibold text-slate-700">Password</label>
-                                <input id="password" name="password" type="password" value="password" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
+                                <input id="password" name="password" type="password" value="12345" required class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
+                                @error('password')
+                                    <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
 
                             <label class="flex items-center gap-3 text-sm text-slate-600">

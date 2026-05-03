@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DieNestingController;
 use App\Http\Controllers\ModuleRecordController;
 use App\Http\Controllers\PortalController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/invoices/job-orders/{id}/summary', [ModuleRecordController::class, 'invoiceJobOrderSummary'])->name('invoices.job-orders.summary');
     Route::get('/modules/{module}/export', [ModuleRecordController::class, 'export'])->name('modules.export');
     Route::get('/reports/customers/{customer}', [PortalController::class, 'customerReport'])->name('reports.customer');
+    Route::post('/printing/die-shapes/generate', [DieNestingController::class, 'generateShape'])->name('printing.die-shapes.generate');
+    Route::post('/printing/die-shapes/upload-svg', [DieNestingController::class, 'uploadSvg'])->name('printing.die-shapes.upload-svg');
+    Route::post('/printing/die-layouts/calculate', [DieNestingController::class, 'calculateLayout'])->name('printing.die-layouts.calculate');
+    Route::get('/printing/die-layouts/{layout}/export.svg', [DieNestingController::class, 'exportSvg'])->name('printing.die-layout.export-svg');
+    Route::get('/printing/die-layouts/{layout}/export.pdf', [DieNestingController::class, 'exportPdf'])->name('printing.die-layout.export-pdf');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
     Route::get('/{page}', [PortalController::class, 'show'])->name('portal.page');
