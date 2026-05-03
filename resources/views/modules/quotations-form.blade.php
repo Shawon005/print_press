@@ -181,5 +181,24 @@ function quotationForm() {
     }
 }
 </script>
+@if (session('locale', 'en') === 'bn')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const map = {
+        'Quotation Module':'কোটেশন মডিউল','Edit Quotation':'কোটেশন এডিট','Create Quotation':'কোটেশন তৈরি','Back to Quotations':'কোটেশনে ফিরুন',
+        'Quotation No.':'কোটেশন নম্বর','Customer':'কাস্টমার','Date':'তারিখ','Valid Until':'বৈধতার শেষ তারিখ',
+        'SL':'ক্রমিক','Description':'বিবরণ','Qty':'পরিমাণ','Unit Price':'ইউনিট মূল্য','Total':'মোট','Action':'অ্যাকশন',
+        'Remove':'রিমুভ','+ Add Row':'+ রো যোগ করুন','Subtotal':'সাবটোটাল','Discount':'ডিসকাউন্ট','Tax/VAT':'ট্যাক্স/ভ্যাট',
+        'Profit (%)':'লাভ (%)','Grand Total':'সর্বমোট','Status':'স্ট্যাটাস','Notes':'নোট','Design Source':'ডিজাইন সোর্স',
+        'Design File (Image/PDF)':'ডিজাইন ফাইল (ইমেজ/পিডিএফ)','Update Quotation':'কোটেশন আপডেট','Save Quotation':'কোটেশন সেভ',
+        'Draft':'ড্রাফট','Sent':'পাঠানো','Approved':'অনুমোদিত'
+    };
+    document.querySelectorAll('label,button,a,h1,h3,p,th,option').forEach(function (el) {
+        const t = el.textContent.trim();
+        if (map[t]) el.textContent = t + '/' + map[t];
+    });
+});
+</script>
+@endif
 </body>
 </html>

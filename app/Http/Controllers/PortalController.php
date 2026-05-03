@@ -31,6 +31,8 @@ use Illuminate\Support\Carbon;
 
 class PortalController extends Controller
 {
+    private string $locale = 'en';
+
     public function home(Request $request): View
     {
         return $this->renderPage('dashboard', $request);
@@ -144,8 +146,19 @@ class PortalController extends Controller
         ]);
     }
 
+    public function setLanguage(Request $request, string $locale): RedirectResponse
+    {
+        $locale = in_array($locale, ['en', 'bn'], true) ? $locale : 'en';
+        $request->session()->put('locale', $locale);
+
+        return redirect()->back();
+    }
+
     private function renderPage(string $page, ?Request $request = null): View
     {
+        $this->locale = in_array((string) $request?->session()->get('locale', 'en'), ['en', 'bn'], true)
+            ? (string) $request?->session()->get('locale', 'en')
+            : 'en';
         $tenant = Tenant::with('plan')->firstOrFail();
         $companyProfile = (array) optional(
             Setting::where('tenant_id', $tenant->id)->where('key', 'company_profile')->first()
@@ -154,6 +167,9 @@ class PortalController extends Controller
         $primaryUser = User::where('tenant_id', $tenant->id)->first();
         $pages = $this->pages();
         $pageData = array_merge($this->pageData($page, $tenant, $request), $this->pageActions($page));
+        if ($this->locale === 'bn') {
+            $pageData = $this->translateDeep($pageData);
+        }
 
         return view('portal', [
             'pages' => $pages,
@@ -166,9 +182,18 @@ class PortalController extends Controller
                 'company_tagline' => $companyProfile['tagline'] ?? null,
                 'company_logo' => $companyProfile['logo_url'] ?? $tenant->logo,
                 'company_profile_url' => route('company-profile.edit'),
-                'role' => 'Tenant Owner',
-                'user' => $primaryUser?->name ?? 'Workspace User',
-                'status' => $tenant->is_active ? 'Workspace Active' : 'Workspace Inactive',
+                'role' => $this->t('Tenant Owner'),
+                'user' => $primaryUser?->name ?? $this->t('Workspace User'),
+                'status' => $tenant->is_active ? $this->t('Workspace Active') : $this->t('Workspace Inactive'),
+            ],
+            'locale' => $this->locale,
+            'ui' => [
+                'company_profile' => $this->t('Company Profile'),
+                'logout' => $this->t('Logout'),
+                'language' => $this->t('Language'),
+                'english' => $this->t('English'),
+                'bangla' => $this->t('Bangla'),
+                'navigation' => $this->t('Navigation'),
             ],
         ]);
     }
@@ -176,25 +201,197 @@ class PortalController extends Controller
     private function pages(): array
     {
         return [
-            'dashboard' => ['label' => 'Dashboard', 'title' => 'Operations dashboard', 'icon' => 'home'],
-            'customers' => ['label' => 'Customers', 'title' => 'CRM and customer history', 'icon' => 'users'],
-            'suppliers' => ['label' => 'Suppliers', 'title' => 'Supplier network and payables', 'icon' => 'building'],
-            'products' => ['label' => 'Products', 'title' => 'Products and service presets', 'icon' => 'box'],
-            'raw-materials' => ['label' => 'Raw Materials', 'title' => 'Material catalog and reorder alerts', 'icon' => 'layers'],
-            'warehouses' => ['label' => 'Warehouses', 'title' => 'Warehouse and stock visibility', 'icon' => 'grid'],
-            'quotations' => ['label' => 'Quotations', 'title' => 'Estimate, approve, convert', 'icon' => 'quote'],
-            'orders' => ['label' => 'Orders', 'title' => 'Jobs, schedules, and production', 'icon' => 'clipboard'],
-            'purchases' => ['label' => 'Purchases', 'title' => 'POs, receiving, supplier payments', 'icon' => 'cart'],
-            'invoices' => ['label' => 'Invoices', 'title' => 'Billing and collections', 'icon' => 'invoice'],
-            'expenses' => ['label' => 'Expenses', 'title' => 'Operating cost control', 'icon' => 'wallet'],
-            'deliveries' => ['label' => 'Deliveries', 'title' => 'Dispatch, routes, and proof of delivery', 'icon' => 'truck'],
-            'reports' => ['label' => 'Reports', 'title' => 'Analytics, due reports, and profitability', 'icon' => 'chart'],
-            'printing' => ['label' => 'Printing', 'title' => 'Die-cut and rectangle planning', 'icon' => 'printer'],
-            'printing-rectangle' => ['label' => 'Rectangle', 'title' => 'Rectangle fit calculator and layout preview', 'icon' => 'printer'],
-            'users-roles' => ['label' => 'Users & Roles', 'title' => 'Tenant access and permissions', 'icon' => 'shield'],
-            'settings' => ['label' => 'Settings', 'title' => 'Tenant configuration and business profile', 'icon' => 'settings'],
-            'subscription' => ['label' => 'Subscription', 'title' => 'Plans, usage, and billing', 'icon' => 'spark'],
+            'dashboard' => ['label' => $this->t('Dashboard'), 'title' => $this->t('Operations dashboard'), 'icon' => 'home'],
+            'customers' => ['label' => $this->t('Customers'), 'title' => $this->t('CRM and customer history'), 'icon' => 'users'],
+            'suppliers' => ['label' => $this->t('Suppliers'), 'title' => $this->t('Supplier network and payables'), 'icon' => 'building'],
+            'products' => ['label' => $this->t('Products'), 'title' => $this->t('Products and service presets'), 'icon' => 'box'],
+            'raw-materials' => ['label' => $this->t('Raw Materials'), 'title' => $this->t('Material catalog and reorder alerts'), 'icon' => 'layers'],
+            'warehouses' => ['label' => $this->t('Warehouses'), 'title' => $this->t('Warehouse and stock visibility'), 'icon' => 'grid'],
+            'quotations' => ['label' => $this->t('Quotations'), 'title' => $this->t('Estimate, approve, convert'), 'icon' => 'quote'],
+            'orders' => ['label' => $this->t('Orders'), 'title' => $this->t('Jobs, schedules, and production'), 'icon' => 'clipboard'],
+            'purchases' => ['label' => $this->t('Purchases'), 'title' => $this->t('POs, receiving, supplier payments'), 'icon' => 'cart'],
+            'invoices' => ['label' => $this->t('Invoices'), 'title' => $this->t('Billing and collections'), 'icon' => 'invoice'],
+            'expenses' => ['label' => $this->t('Expenses'), 'title' => $this->t('Operating cost control'), 'icon' => 'wallet'],
+            'deliveries' => ['label' => $this->t('Deliveries'), 'title' => $this->t('Dispatch, routes, and proof of delivery'), 'icon' => 'truck'],
+            'reports' => ['label' => $this->t('Reports'), 'title' => $this->t('Analytics, due reports, and profitability'), 'icon' => 'chart'],
+            'printing' => ['label' => $this->t('Printing'), 'title' => $this->t('Die-cut and rectangle planning'), 'icon' => 'printer'],
+            'printing-rectangle' => ['label' => $this->t('Rectangle'), 'title' => $this->t('Rectangle fit calculator and layout preview'), 'icon' => 'printer'],
+            'users-roles' => ['label' => $this->t('Users & Roles'), 'title' => $this->t('Tenant access and permissions'), 'icon' => 'shield'],
+            'settings' => ['label' => $this->t('Settings'), 'title' => $this->t('Tenant configuration and business profile'), 'icon' => 'settings'],
+            'subscription' => ['label' => $this->t('Subscription'), 'title' => $this->t('Plans, usage, and billing'), 'icon' => 'spark'],
         ];
+    }
+
+    private function t(string $text): string
+    {
+        if ($this->locale !== 'bn') {
+            return $text;
+        }
+
+        $map = [
+            'Dashboard' => 'ড্যাশবোর্ড',
+            'Customers' => 'কাস্টমার',
+            'Suppliers' => 'সাপ্লায়ার',
+            'Products' => 'প্রোডাক্ট',
+            'Raw Materials' => 'র ম্যাটেরিয়াল',
+            'Warehouses' => 'গুদাম',
+            'Quotations' => 'কোটেশন',
+            'Orders' => 'অর্ডার',
+            'Purchases' => 'পারচেজ',
+            'Invoices' => 'ইনভয়েস',
+            'Expenses' => 'খরচ',
+            'Deliveries' => 'ডেলিভারি',
+            'Reports' => 'রিপোর্ট',
+            'Printing' => 'প্রিন্টিং',
+            'Rectangle' => 'রেক্ট্যাঙ্গেল',
+            'Users & Roles' => 'ইউজার ও রোল',
+            'Settings' => 'সেটিংস',
+            'Subscription' => 'সাবস্ক্রিপশন',
+            'Operations dashboard' => 'অপারেশন ড্যাশবোর্ড',
+            'Workspace Active' => 'ওয়ার্কস্পেস চালু',
+            'Workspace Inactive' => 'ওয়ার্কস্পেস বন্ধ',
+            'Workspace User' => 'ওয়ার্কস্পেস ইউজার',
+            'Tenant Owner' => 'টেন্যান্ট ওনার',
+            'Company Profile' => 'কোম্পানি প্রোফাইল',
+            'Logout' => 'লগআউট',
+            'Language' => 'ভাষা',
+            'English' => 'English',
+            'Bangla' => 'বাংলা',
+            'Navigation' => 'নেভিগেশন',
+            'Create Quotation' => 'কোটেশন তৈরি',
+            'Open Orders' => 'অর্ডার দেখুন',
+            'Total Orders' => 'মোট অর্ডার',
+            'Recent orders' => 'সাম্প্রতিক অর্ডার',
+            'Open Rectangle Page' => 'রেক্ট্যাঙ্গেল পেজ খুলুন',
+            'Open Die-Cut Page' => 'ডাই-কাট পেজ খুলুন',
+            'Active Customers' => 'সক্রিয় কাস্টমার',
+            'Pending Invoices' => 'অপেক্ষমান ইনভয়েস',
+            'Low Stock Alerts' => 'কম স্টক সতর্কতা',
+            'Total Customers' => 'মোট কাস্টমার',
+            'VIP Customers' => 'ভিআইপি কাস্টমার',
+            'Lead Records' => 'লিড রেকর্ড',
+            'Preferred' => 'প্রেফার্ড',
+            'Supplier Dues' => 'সাপ্লায়ার বাকি',
+            'Supplier directory' => 'সাপ্লায়ার ডিরেক্টরি',
+            'Materials' => 'ম্যাটেরিয়াল',
+            'Low Stock' => 'কম স্টক',
+            'Stock Value' => 'স্টক মূল্য',
+            'Avg Cost' => 'গড় খরচ',
+            'Total Spend' => 'মোট খরচ',
+            'Utilities' => 'ইউটিলিটিস',
+            'Transport' => 'ট্রান্সপোর্ট',
+            'Transport Cost' => 'ট্রান্সপোর্ট খরচ',
+            'Expense ledger' => 'খরচ খতিয়ান',
+            'Delivery list' => 'ডেলিভারি তালিকা',
+            'Out for Delivery' => 'ডেলিভারির জন্য বের',
+            'Sales Total' => 'সেলস টোটাল',
+            'Expense Total' => 'এক্সপেন্স টোটাল',
+            'Receivables' => 'রিসিভেবলস',
+            'Profit Estimate' => 'লাভের অনুমান',
+            'Choose period and range' => 'সময়কাল এবং ব্যবধান নির্বাচন করুন',
+            'Revenue vs Expense vs Profit' => 'রাজস্ব বনাম খরচ বনাম লাভ',
+            'Customer directory' => 'কাস্টমার ডিরেক্টরি',
+            'Top Customer Report' => 'শীর্ষ কাস্টমার রিপোর্ট',
+            'Add User' => 'ইউজার যোগ করুন',
+            'Add Paper Type' => 'পেপার টাইপ যোগ করুন',
+            'View Reports' => 'রিপোর্ট দেখুন',
+            'Export Reports' => 'রিপোর্ট এক্সপোর্ট',
+            'Add Role' => 'রোল যোগ করুন',
+            'Add Ink Type' => 'ইঙ্ক টাইপ যোগ করুন',
+            'Back to Dashboard' => 'ড্যাশবোর্ডে ফিরুন',
+            'Export to Excel' => 'এক্সেলে এক্সপোর্ট',
+            'Actions' => 'অ্যাকশন',
+            'Print' => 'প্রিন্ট',
+            'Edit' => 'এডিট',
+            'Delete' => 'ডিলিট',
+            'View' => 'দেখুন',
+            'Update' => 'আপডেট',
+            'Apply Filter' => 'ফিল্টার প্রয়োগ',
+            'Period' => 'সময়কাল',
+            'Monthly' => 'মাসিক',
+            'Day' => 'দিন',
+            'Month' => 'মাস',
+            'Status' => 'স্ট্যাটাস',
+            'Report' => 'রিপোর্ট',
+            'Description' => 'বিবরণ',
+            'Source' => 'উৎস',
+            'Format' => 'ফরম্যাট',
+            'Ready' => 'প্রস্তুত',
+            'Customer' => 'কাস্টমার',
+            'Revenue' => 'আয়',
+            'Paid' => 'পরিশোধিত',
+            'Due' => 'বাকি',
+            'Last Invoice' => 'শেষ ইনভয়েস',
+            'Action' => 'অ্যাকশন',
+            'View Report' => 'রিপোর্ট দেখুন',
+            'Name' => 'নাম',
+            'Email' => 'ইমেইল',
+            'Phone' => 'ফোন',
+            'Role' => 'রোল',
+            'Created' => 'তৈরি',
+            'Code' => 'কোড',
+            'Notes' => 'নোট',
+            'Updated' => 'আপডেট',
+            'Type' => 'ধরন',
+            'Details' => 'বিস্তারিত',
+            'Plan' => 'প্ল্যান',
+            'Users' => 'ইউজার',
+            'Warehouses' => 'গুদাম',
+            'Storage' => 'স্টোরেজ',
+            'Unlimited' => 'সীমাহীন',
+            'Pending' => 'অপেক্ষমান',
+            'Assigned' => 'নির্ধারিত',
+            'Out for delivery' => 'ডেলিভারিতে আছে',
+            'Delivered' => 'ডেলিভার্ড',
+            'Failed' => 'ব্যর্থ',
+            'Returned' => 'ফেরত',
+            'Invoice Status' => 'ইনভয়েস স্ট্যাটাস',
+            'Due Report' => 'ডিউ রিপোর্ট',
+            'Sales Report' => 'সেলস রিপোর্ট',
+            'Inventory Report' => 'ইনভেন্টরি রিপোর্ট',
+            'Purchase Payables' => 'পারচেজ পেয়াবল',
+            'Daily' => 'দৈনিক',
+            'Live' => 'লাইভ',
+        ];
+
+        return $map[$text] ?? $text;
+    }
+
+    private function translateDeep(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[$k] = $this->translateDeep($v);
+            }
+            return $out;
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $translated = $this->t($value);
+        if ($translated !== $value) {
+            return $translated;
+        }
+
+        $phrases = [
+            'Create ' => 'তৈরি ',
+            'Add ' => 'যোগ করুন ',
+            'Export ' => 'এক্সপোর্ট ',
+            'Open ' => 'খুলুন ',
+            'Back to ' => 'ফিরুন ',
+        ];
+
+        foreach ($phrases as $en => $bn) {
+            if (str_starts_with($value, $en)) {
+                $tail = substr($value, strlen($en));
+                return $bn . $this->t($tail);
+            }
+        }
+
+        return $value;
     }
 
     private function pageData(string $page, Tenant $tenant, ?Request $request = null): array
@@ -385,7 +582,7 @@ class PortalController extends Controller
             'stats' => [
                 ['label' => 'Total Orders', 'value' => (string) PrintOrder::where('tenant_id', $tenant->id)->count(), 'note' => 'jobs tracked in ERP'],
                 ['label' => 'Active Customers', 'value' => (string) Customer::where('tenant_id', $tenant->id)->count(), 'note' => 'CRM records in workspace'],
-                ['label' => 'Pending Invoices', 'value' => '$' . number_format((float) Invoice::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'current receivable balance'],
+                ['label' => 'Pending Invoices', 'value' => '৳' . number_format((float) Invoice::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'current receivable balance'],
                 ['label' => 'Low Stock Alerts', 'value' => (string) RawMaterial::where('tenant_id', $tenant->id)->whereColumn('current_stock', '<=', 'minimum_stock')->count(), 'note' => 'materials below threshold'],
             ],
             'feature_cards' => [
@@ -401,7 +598,7 @@ class PortalController extends Controller
                     $order->customer?->company_name ?? '-',
                     $order->job_title,
                     optional($order->expected_delivery_date)->format('M d, Y'),
-                    '$' . number_format((float) $order->total, 0),
+                    '৳' . number_format((float) $order->total, 0),
                     str($order->status)->headline()->toString(),
                 ])->all(),
             ],
@@ -460,7 +657,7 @@ class PortalController extends Controller
                 ['label' => 'Suppliers', 'value' => (string) $suppliers->count(), 'note' => 'registered suppliers'],
                 ['label' => 'Preferred', 'value' => (string) $suppliers->where('status', 'preferred')->count(), 'note' => 'top-ranked vendors'],
                 ['label' => 'Open POs', 'value' => (string) PurchaseOrder::where('tenant_id', $tenant->id)->whereIn('status', ['draft', 'ordered', 'partial_received'])->count(), 'note' => 'awaiting full closure'],
-                ['label' => 'Supplier Due', 'value' => '$' . number_format((float) PurchaseOrder::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'payables total'],
+                ['label' => 'Supplier Due', 'value' => '৳' . number_format((float) PurchaseOrder::where('tenant_id', $tenant->id)->sum('due_amount'), 0), 'note' => 'payables total'],
             ],
             'table' => [
                 'title' => 'Supplier directory',
@@ -494,7 +691,7 @@ class PortalController extends Controller
             'stats' => [
                 ['label' => 'Products', 'value' => (string) $products->count(), 'note' => 'service and item definitions'],
                 ['label' => 'Categories', 'value' => (string) $products->pluck('category_id')->filter()->unique()->count(), 'note' => 'active product groups'],
-                ['label' => 'Average Price', 'value' => '$' . number_format((float) $products->avg('base_price'), 2), 'note' => 'mean base price'],
+                ['label' => 'Average Price', 'value' => '৳' . number_format((float) $products->avg('base_price'), 2), 'note' => 'mean base price'],
                 ['label' => 'Active Products', 'value' => (string) $products->where('status', 'active')->count(), 'note' => 'currently sellable'],
             ],
             'table' => [
@@ -505,7 +702,7 @@ class PortalController extends Controller
                     $product->name,
                     $product->category?->name ?? '-',
                     $product->unit,
-                    '$' . number_format((float) $product->base_price, 2),
+                    '৳' . number_format((float) $product->base_price, 2),
                     str($product->status)->headline()->toString(),
                 ])->all(),
                 'record_ids' => $products->pluck('id')->all(),
@@ -529,8 +726,8 @@ class PortalController extends Controller
             'stats' => [
                 ['label' => 'Materials', 'value' => (string) $materials->count(), 'note' => 'catalogued raw materials'],
                 ['label' => 'Low Stock', 'value' => (string) $materials->filter(fn (RawMaterial $material) => $material->current_stock <= $material->minimum_stock)->count(), 'note' => 'needs reorder action'],
-                ['label' => 'Stock Value', 'value' => '$' . number_format((float) $materials->sum(fn (RawMaterial $material) => $material->current_stock * $material->average_cost), 0), 'note' => 'estimated inventory value'],
-                ['label' => 'Avg Cost', 'value' => '$' . number_format((float) $materials->avg('average_cost'), 2), 'note' => 'average material cost'],
+                ['label' => 'Stock Value', 'value' => '৳' . number_format((float) $materials->sum(fn (RawMaterial $material) => $material->current_stock * $material->average_cost), 0), 'note' => 'estimated inventory value'],
+                ['label' => 'Avg Cost', 'value' => '৳' . number_format((float) $materials->avg('average_cost'), 2), 'note' => 'average material cost'],
             ],
             'table' => [
                 'title' => 'Material catalog',
@@ -600,7 +797,7 @@ class PortalController extends Controller
                 ['label' => 'Open Quotes', 'value' => (string) $quotations->whereIn('status', ['draft', 'sent'])->count(), 'note' => 'awaiting next action'],
                 ['label' => 'Approved', 'value' => (string) $quotations->where('status', 'approved')->count(), 'note' => 'ready for conversion'],
                 ['label' => 'Converted', 'value' => (string) $quotations->where('status', 'converted')->count(), 'note' => 'converted into orders'],
-                ['label' => 'Quote Value', 'value' => '$' . number_format((float) $quotations->sum('total'), 0), 'note' => 'total quotation pipeline'],
+                ['label' => 'Quote Value', 'value' => '৳' . number_format((float) $quotations->sum('total'), 0), 'note' => 'total quotation pipeline'],
             ],
             'table' => [
                 'title' => 'Quotation list',
@@ -610,7 +807,7 @@ class PortalController extends Controller
                     $quotation->customer?->company_name ?? '-',
                     optional($quotation->inquiry_date)->format('M d, Y'),
                     optional($quotation->valid_until)->format('M d, Y'),
-                    '$' . number_format((float) $quotation->total, 0),
+                    '৳' . number_format((float) $quotation->total, 0),
                     str($quotation->status)->headline()->toString(),
                 ])->all(),
                 'record_ids' => $quotations->pluck('id')->all(),
@@ -635,7 +832,7 @@ class PortalController extends Controller
                 ['label' => 'Open Jobs', 'value' => (string) $orders->count(), 'note' => 'total orders in workspace'],
                 ['label' => 'In Production', 'value' => (string) $orders->where('status', 'in_production')->count(), 'note' => 'currently on production floor'],
                 ['label' => 'Due This Week', 'value' => (string) $orders->filter(fn (JobOrder $order) => optional($order->due_date)?->isCurrentWeek())->count(), 'note' => 'delivery horizon'],
-                ['label' => 'Receivable', 'value' => '$' . number_format((float) $orders->sum('estimated_total_price'), 0), 'note' => 'estimated job receivable'],
+                ['label' => 'Receivable', 'value' => '৳' . number_format((float) $orders->sum('estimated_total_price'), 0), 'note' => 'estimated job receivable'],
             ],
             'table' => [
                 'title' => 'Order board',
@@ -685,8 +882,8 @@ class PortalController extends Controller
             'stats' => [
                 ['label' => 'Open POs', 'value' => (string) $purchaseOrders->whereIn('status', ['draft', 'ordered', 'partial_received'])->count(), 'note' => 'orders not fully closed'],
                 ['label' => 'Received', 'value' => (string) $purchaseOrders->where('status', 'received')->count(), 'note' => 'fully received POs'],
-                ['label' => 'Committed Value', 'value' => '$' . number_format((float) $purchaseOrders->sum('total'), 0), 'note' => 'gross purchase value'],
-                ['label' => 'Due Amount', 'value' => '$' . number_format((float) $purchaseOrders->sum('due_amount'), 0), 'note' => 'supplier payable total'],
+                ['label' => 'Committed Value', 'value' => '৳' . number_format((float) $purchaseOrders->sum('total'), 0), 'note' => 'gross purchase value'],
+                ['label' => 'Due Amount', 'value' => '৳' . number_format((float) $purchaseOrders->sum('due_amount'), 0), 'note' => 'supplier payable total'],
             ],
             'table' => [
                 'title' => 'Purchase order list',
@@ -696,7 +893,7 @@ class PortalController extends Controller
                     $purchaseOrder->supplier?->company_name ?? '-',
                     $purchaseOrder->warehouse?->name ?? '-',
                     optional($purchaseOrder->expected_date)->format('M d, Y'),
-                    '$' . number_format((float) $purchaseOrder->total, 0),
+                    '৳' . number_format((float) $purchaseOrder->total, 0),
                     str($purchaseOrder->status)->headline()->toString(),
                 ])->all(),
                 'record_ids' => $purchaseOrders->pluck('id')->all(),
@@ -726,8 +923,8 @@ class PortalController extends Controller
             'actions' => ['New Invoice', 'Record Payment'],
             'stats' => [
                 ['label' => 'Invoices Issued', 'value' => (string) $invoices->count(), 'note' => 'all generated invoices'],
-                ['label' => 'Collected', 'value' => '$' . number_format((float) $invoices->sum('paid_amount'), 0), 'note' => 'payments received'],
-                ['label' => 'Due Amount', 'value' => '$' . number_format((float) $invoices->sum('due_amount'), 0), 'note' => 'outstanding balance'],
+                ['label' => 'Collected', 'value' => '৳' . number_format((float) $invoices->sum('paid_amount'), 0), 'note' => 'payments received'],
+                ['label' => 'Due Amount', 'value' => '৳' . number_format((float) $invoices->sum('due_amount'), 0), 'note' => 'outstanding balance'],
                 ['label' => 'Paid Invoices', 'value' => (string) $paidInvoices, 'note' => 'closed billing documents'],
             ],
             'table' => [
@@ -751,7 +948,7 @@ class PortalController extends Controller
                         $invoice->customer?->company_name ?? '-',
                         optional($invoice->invoice_date)->format('M d, Y'),
                         optional($invoice->due_date)->format('M d, Y'),
-                        '$' . number_format((float) $invoice->total, 0),
+                        '৳' . number_format((float) $invoice->total, 0),
                         $paymentStatus,
                     ];
                 })->all(),
@@ -775,9 +972,9 @@ class PortalController extends Controller
             'actions' => ['Add Expense', 'Export Ledger'],
             'stats' => [
                 ['label' => 'Expenses', 'value' => (string) $expenses->count(), 'note' => 'expense entries recorded'],
-                ['label' => 'Total Spend', 'value' => '$' . number_format((float) $expenses->sum('amount'), 0), 'note' => 'current expense total'],
-                ['label' => 'Utilities', 'value' => '$' . number_format((float) $expenses->where('category', 'Utility')->sum('amount'), 0), 'note' => 'utility costs'],
-                ['label' => 'Transport', 'value' => '$' . number_format((float) $expenses->where('category', 'Transport')->sum('amount'), 0), 'note' => 'dispatch-related spend'],
+                ['label' => 'Total Spend', 'value' => '৳' . number_format((float) $expenses->sum('amount'), 0), 'note' => 'current expense total'],
+                ['label' => 'Utilities', 'value' => '৳' . number_format((float) $expenses->where('category', 'Utility')->sum('amount'), 0), 'note' => 'utility costs'],
+                ['label' => 'Transport', 'value' => '৳' . number_format((float) $expenses->where('category', 'Transport')->sum('amount'), 0), 'note' => 'dispatch-related spend'],
             ],
             'table' => [
                 'title' => 'Expense ledger',
@@ -787,7 +984,7 @@ class PortalController extends Controller
                     $expense->category,
                     $expense->title,
                     $expense->reference_no,
-                    '$' . number_format((float) $expense->amount, 0),
+                    '৳' . number_format((float) $expense->amount, 0),
                     'Recorded',
                 ])->all(),
                 'record_ids' => $expenses->pluck('id')->all(),
@@ -812,7 +1009,7 @@ class PortalController extends Controller
                 ['label' => 'Deliveries', 'value' => (string) $deliveries->count(), 'note' => 'all dispatch records'],
                 ['label' => 'Delivered', 'value' => (string) $deliveries->where('status', 'delivered')->count(), 'note' => 'completed dispatches'],
                 ['label' => 'Out for Delivery', 'value' => (string) $deliveries->where('status', 'out_for_delivery')->count(), 'note' => 'live route movement'],
-                ['label' => 'Transport Cost', 'value' => '$' . number_format((float) $deliveries->sum('transport_cost'), 0), 'note' => 'dispatch cost total'],
+                ['label' => 'Transport Cost', 'value' => '৳' . number_format((float) $deliveries->sum('transport_cost'), 0), 'note' => 'dispatch cost total'],
             ],
             'table' => [
                 'title' => 'Delivery list',
@@ -822,7 +1019,7 @@ class PortalController extends Controller
                     $delivery->jobOrder?->job_number ?? ('ID: ' . $delivery->order_id),
                     optional($delivery->delivery_date)->format('M d, Y'),
                     $delivery->vehicle_no,
-                    '$' . number_format((float) $delivery->transport_cost, 0),
+                    '৳' . number_format((float) $delivery->transport_cost, 0),
                     str($delivery->status)->headline()->toString(),
                 ])->all(),
                 'record_ids' => $deliveries->pluck('id')->all(),
@@ -959,19 +1156,16 @@ class PortalController extends Controller
                 ],
             ],
             'stats' => [
-                ['label' => 'Sales Total', 'value' => '$' . number_format($sales, 0), 'note' => 'invoice-backed sales'],
-                ['label' => 'Expense Total', 'value' => '$' . number_format($expenses, 0), 'note' => 'recorded operating costs'],
-                ['label' => 'Receivables', 'value' => '$' . number_format((float) $invoiceRows->sum('due_amount'), 0), 'note' => 'customer dues'],
-                ['label' => 'Profit Estimate', 'value' => '$' . number_format($sales - $expenses, 0), 'note' => 'sales minus expenses'],
+                ['label' => 'Sales Total', 'value' => '৳' . number_format($sales, 0), 'note' => 'invoice-backed sales'],
+                ['label' => 'Expense Total', 'value' => '৳' . number_format($expenses, 0), 'note' => 'recorded operating costs'],
+                ['label' => 'Receivables', 'value' => '৳' . number_format((float) $invoiceRows->sum('due_amount'), 0), 'note' => 'customer dues'],
+                ['label' => 'Profit Estimate', 'value' => '৳' . number_format($sales - $expenses, 0), 'note' => 'sales minus expenses'],
             ],
             'table' => [
                 'title' => 'Available reports',
                 'columns' => ['Report', 'Description', 'Source', 'Cadence', 'Format', 'Status'],
                 'rows' => [
-                    ['Sales Report', 'Invoice totals by customer and date', 'Invoices', 'Daily', 'Excel/PDF', 'Ready'],
-                    ['Due Report', 'Outstanding invoice balances', 'Invoices', 'Daily', 'Excel', 'Ready'],
-                    ['Inventory Report', 'Material stock and low alerts', 'Raw Materials', 'Live', 'Excel', 'Ready'],
-                    ['Purchase Payables', 'Supplier due balances', 'Purchase Orders', 'Daily', 'Excel', 'Ready'],
+                  
                 ],
             ],
             'secondary_table' => [
@@ -980,9 +1174,9 @@ class PortalController extends Controller
                 'rows' => $customerRows->map(fn (array $row) => [
                     $row['customer'],
                     (string) $row['invoices'],
-                    '$' . number_format($row['revenue'], 2),
-                    '$' . number_format($row['paid'], 2),
-                    '$' . number_format($row['due'], 2),
+                    '৳' . number_format($row['revenue'], 2),
+                    '৳' . number_format($row['paid'], 2),
+                    '৳' . number_format($row['due'], 2),
                     $row['last_invoice'] ?: '-',
                     'View Report',
                 ])->all(),
@@ -1255,7 +1449,7 @@ class PortalController extends Controller
                     $plan->max_orders_per_month ? (string) $plan->max_orders_per_month : 'Unlimited',
                     $plan->max_warehouses ? (string) $plan->max_warehouses : 'Unlimited',
                     $plan->max_storage_mb ? $plan->max_storage_mb . ' MB' : 'Unlimited',
-                    '$' . number_format((float) $plan->monthly_price, 0) . '/mo',
+                    '৳' . number_format((float) $plan->monthly_price, 0) . '/mo',
                 ])->all(),
             ],
             'side_panel' => [
@@ -1265,3 +1459,4 @@ class PortalController extends Controller
         ];
     }
 }
+

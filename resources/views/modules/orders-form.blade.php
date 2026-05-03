@@ -158,6 +158,27 @@
                     }
                 }
             }
-        </script>
+</script>
+@if (session('locale', 'en') === 'bn')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const map = {
+            'Orders Module':'অর্ডার মডিউল','Back to Orders':'অর্ডারে ফিরুন','Job Number':'জব নম্বর','Job Title':'জব শিরোনাম',
+            'Customer':'কাস্টমার','Order Date':'অর্ডারের তারিখ','Due Date':'ডেলিভারির তারিখ','Status':'স্ট্যাটাস',
+            'Paper Type':'পেপার টাইপ','Raw Material':'র ম্যাটেরিয়াল','GSM':'জিএসএম','Ink Type':'ইঙ্ক টাইপ',
+            'Pantone Codes':'প্যান্টোন কোড','Finish':'ফিনিশ','Page Size':'পেইজ সাইজ','Custom Width (in)':'কাস্টম প্রস্থ (ইঞ্চি)',
+            'Custom Height (in)':'কাস্টম উচ্চতা (ইঞ্চি)','Total Copies':'মোট কপি','Standard Sheet':'স্ট্যান্ডার্ড শিট',
+            'Colors':'রং','Calculation Preview':'ক্যালকুলেশন প্রিভিউ','Estimated Material Cost':'আনুমানিক ম্যাটেরিয়াল খরচ',
+            'Estimated Other Cost':'আনুমানিক অন্যান্য খরচ','Estimated Unit Price':'আনুমানিক ইউনিট মূল্য','Design Source':'ডিজাইন সোর্স',
+            'Design File (Image/PDF)':'ডিজাইন ফাইল (ইমেজ/পিডিএফ)','Notes':'নোট','Previous':'আগের','Next':'পরের',
+            'Update Order':'অর্ডার আপডেট','Save Order':'অর্ডার সেভ'
+        };
+        document.querySelectorAll('label,button,a,h1,h3,p,span,option').forEach(function (el) {
+            const t = el.textContent.trim();
+            if (map[t]) el.textContent = t + '/' + map[t];
+        });
+    });
+</script>
+@endif
     </body>
 </html>

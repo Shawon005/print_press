@@ -12,6 +12,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware('auth')->group(function (): void {
+    Route::get('/language/{locale}', [PortalController::class, 'setLanguage'])->name('portal.language');
     Route::get('/', [PortalController::class, 'home'])->name('portal.home');
     Route::get('/company-profile', [PortalController::class, 'companyProfile'])->name('company-profile.edit');
     Route::post('/settings/company-profile', [PortalController::class, 'updateCompanyProfile'])->name('settings.company-profile.update');

@@ -7,6 +7,11 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans">
+        @php
+            $L = function ($en, $bn) use ($locale) {
+                return ($locale ?? 'en') === 'bn' ? $bn : $en;
+            };
+        @endphp
         <div class="min-h-screen bg-[var(--app-bg)] text-slate-900">
             <div class="app-shell mx-auto min-h-screen max-w-[1680px]">
                 <aside class="app-sidebar border-r border-slate-200 bg-white/92 px-5 py-6 backdrop-blur">
@@ -18,7 +23,7 @@
                             </svg>
                         </div>
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">Printing Press</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">{{ $L('Printing Press', 'প্রিন্টিং প্রেস') }}</p>
                             <h1 class="text-xl font-black tracking-tight text-slate-900">{{ $workspace['name'] }}</h1>
                         </div>
                     </a>
@@ -86,9 +91,9 @@
                     </nav>
 
                     <div class="mt-auto rounded-[28px] bg-slate-950 px-5 py-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">Blueprint Coverage</p>
-                        <h2 class="mt-3 text-2xl font-black leading-tight">From CRM to dispatch in one ERP workspace.</h2>
-                        <p class="mt-3 text-sm text-slate-300">Tenant isolation, roles and permissions, finance visibility, supplier tracking, and production stages are all represented across this website.</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">{{ $L('Blueprint Coverage', 'ব্লুপ্রিন্ট কাভারেজ') }}</p>
+                        <h2 class="mt-3 text-2xl font-black leading-tight">{{ $L('From CRM to dispatch in one ERP workspace.', 'একটি ERP ওয়ার্কস্পেসে CRM থেকে ডেলিভারি পর্যন্ত সব কাজ।') }}</h2>
+                        <p class="mt-3 text-sm text-slate-300">{{ $L('Tenant isolation, roles and permissions, finance visibility, supplier tracking, and production stages are all represented across this website.', 'টেন্যান্ট আলাদা রাখা, রোল ও পারমিশন, ফাইন্যান্স দেখা, সাপ্লায়ার ট্র্যাকিং এবং প্রোডাকশন ধাপ সবকিছু এই সিস্টেমে আছে।') }}</p>
                     </div>
                 </aside>
 
@@ -106,10 +111,17 @@
                                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                                     {{ $workspace['status'] }}
                                 </button>
-                                <a href="{{ $workspace['company_profile_url'] }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Company Profile</a>
+                                <div class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                                    <span class="text-xs font-semibold text-slate-500">{{ $ui['language'] }}</span>
+                                    <select class="bg-transparent text-sm font-semibold text-slate-700 outline-none" onchange="if(this.value){ window.location.href=this.value; }">
+                                        <option value="{{ route('portal.language', ['locale' => 'en']) }}" @selected($locale === 'en')>{{ $ui['english'] }}</option>
+                                        <option value="{{ route('portal.language', ['locale' => 'bn']) }}" @selected($locale === 'bn')>{{ $ui['bangla'] }}</option>
+                                    </select>
+                                </div>
+                                <a href="{{ $workspace['company_profile_url'] }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['company_profile'] }}</a>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
-                                    <button type="submit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Logout</button>
+                                    <button type="submit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['logout'] }}</button>
                                 </form>
                                 <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
                                     @if (!empty($workspace['company_logo']))
@@ -177,7 +189,7 @@
                             <section class="grid gap-6 xl:grid-cols-3">
                                 @foreach ($pageData['feature_cards'] as $card)
                                     <article class="surface-card p-6">
-                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Highlight</p>
+                                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">{{ $L('Highlight', 'হাইলাইট') }}</p>
                                         <h3 class="mt-3 text-2xl font-black tracking-tight text-slate-900">{{ $card['title'] }}</h3>
                                         <p class="mt-3 text-sm leading-7 text-slate-600">{{ $card['text'] }}</p>
                                     </article>
@@ -190,8 +202,8 @@
                                 <article class="surface-card p-6">
                                     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
                                         <div>
-                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Settings Masters</p>
-                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">Paper, Ink, Sheet, Unit</h3>
+                                            <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">{{ $L('Settings Masters', 'সেটিংস মাস্টার') }}</p>
+                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">{{ $L('Paper, Ink, Sheet, Unit', 'পেপার, ইঙ্ক, শিট, ইউনিট') }}</h3>
                                         </div>
                                         <div class="flex flex-wrap gap-2">
                                             @foreach ($pageData['settings_tabs'] as $tab)
@@ -203,7 +215,7 @@
                                     @foreach ($pageData['settings_tabs'] as $tab)
                                         <div x-show="activeTab === '{{ $tab['key'] }}'" x-cloak>
                                             <div class="mb-4 flex justify-end">
-                                                <a href="{{ $tab['create_url'] }}" class="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Add {{ $tab['label'] }}</a>
+                                                <a href="{{ $tab['create_url'] }}" class="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $L('Add', 'যোগ করুন') }} {{ $tab['label'] }}</a>
                                             </div>
                                             <div class="overflow-x-auto">
                                                 <table class="min-w-full border-separate border-spacing-y-3 text-left">
@@ -212,7 +224,7 @@
                                                             @foreach ($tab['columns'] as $column)
                                                                 <th class="px-4">{{ $column }}</th>
                                                             @endforeach
-                                                            <th class="px-4 text-right">Actions</th>
+                                                            <th class="px-4 text-right">{{ $L('Actions', 'অ্যাকশন') }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -223,12 +235,12 @@
                                                                 @endforeach
                                                                 <td class="rounded-r-2xl px-4 py-4 text-right">
                                                                     <div class="flex flex-wrap justify-end gap-2">
-                                                                        <a href="{{ route('modules.print', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
-                                                                        <a href="{{ route('modules.edit', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
+                                                                        <a href="{{ route('modules.print', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">{{ $L('Print', 'প্রিন্ট') }}</a>
+                                                                        <a href="{{ route('modules.edit', [$row['module'], $row['record_id']]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">{{ $L('Edit', 'এডিট') }}</a>
                                                                         <form method="POST" action="{{ route('modules.destroy', [$row['module'], $row['record_id']]) }}" onsubmit="return confirm('Delete this record?')">
                                                                             @csrf
                                                                             @method('DELETE')
-                                                                            <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
+                                                                            <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">{{ $L('Delete', 'ডিলিট') }}</button>
                                                                         </form>
                                                                     </div>
                                                                 </td>
@@ -248,7 +260,7 @@
                                     <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                         <div>
                                             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Report Filters</p>
-                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">Choose period and range</h3>
+                                            <h3 class="text-2xl font-black tracking-tight text-slate-900">সময়কাল এবং ব্যবধান নির্বাচন করুন</h3>
                                         </div>
                                         <form method="GET" action="{{ $pageData['report_filters']['submit_url'] }}" class="flex flex-wrap items-end gap-3">
                                             <div>
@@ -262,7 +274,7 @@
                                                 <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Month</label>
                                                 <input type="month" name="month" value="{{ $pageData['report_filters']['month'] ?? now()->format('Y-m') }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
                                             </div>
-                                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Apply Filter</button>
+                                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $L('Apply Filter', 'ফিল্টার প্রয়োগ') }}</button>
                                         </form>
                                     </div>
                                 </article>
@@ -474,11 +486,11 @@
                                     </div>
                                     <div class="flex flex-col gap-3 sm:flex-row">
                                         @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
-                                            <button type="submit" form="quotation-batch-print-form" class="rounded-2xl bg-slate-950 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Print Selected</button>
+                                            <button type="submit" form="quotation-batch-print-form" class="rounded-2xl bg-slate-950 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $L('Print Selected', 'নির্বাচিতগুলো প্রিন্ট') }}</button>
                                         @endif
                                         <input type="text" placeholder="Search records" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
                                         @if (!empty($pageData['export_url']))
-                                            <a href="{{ $pageData['export_url'] }}" class="rounded-2xl bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-600/20">Export to Excel</a>
+                                            <a href="{{ $pageData['export_url'] }}" class="rounded-2xl bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-emerald-600/20">{{ $L('Export to Excel', 'এক্সেলে এক্সপোর্ট') }}</a>
                                         @endif
                                     </div>
                                 </div>
@@ -496,7 +508,7 @@
                                                     <th class="px-4">{{ $column }}</th>
                                                 @endforeach
                                                 @if (!empty($pageData['table']['record_ids']))
-                                                    <th class="px-4 text-right">Actions</th>
+                                                    <th class="px-4 text-right">{{ $L('Actions', 'অ্যাকশন') }}</th>
                                                 @endif
                                             </tr>
                                         </thead>
@@ -537,21 +549,21 @@
                                                                                 <option value="{{ $statusOption }}" @selected(($pageData['table']['status_values'][$rowIndex] ?? null) === $statusOption)>{{ str($statusOption)->headline() }}</option>
                                                                             @endforeach
                                                                         </select>
-                                                                        <button type="submit" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Update</button>
+                                                                        <button type="submit" class="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white">{{ $L('Update', 'আপডেট') }}</button>
                                                                     </form>
                                                                 @endif
                                                                 @if (in_array($rowModule, ['orders', 'quotations'], true))
-                                                                    <a href="{{ route('modules.show', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">View</a>
+                                                                    <a href="{{ route('modules.show', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">{{ $L('View', 'দেখুন') }}</a>
                                                                 @endif
                                                                 @php($printableModules = ['customers', 'suppliers', 'products', 'raw-materials', 'warehouses', 'quotations', 'orders', 'purchases', 'invoices', 'deliveries', 'expenses', 'users', 'roles', 'paper-types', 'ink-types', 'standard-sheets', 'units'])
                                                                 @if (in_array($rowModule, $printableModules, true))
-                                                                    <a href="{{ route('modules.print', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">Print</a>
+                                                                    <a href="{{ route('modules.print', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" target="_blank">{{ $L('Print', 'প্রিন্ট') }}</a>
                                                                 @endif
-                                                                <a href="{{ route('modules.edit', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Edit</a>
+                                                                <a href="{{ route('modules.edit', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">{{ $L('Edit', 'এডিট') }}</a>
                                                                 <form method="POST" action="{{ route('modules.destroy', [$rowModule, $pageData['table']['record_ids'][$rowIndex]]) }}" onsubmit="return confirm('Delete this record?')">
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">Delete</button>
+                                                                    <button type="submit" class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white">{{ $L('Delete', 'ডিলিট') }}</button>
                                                                 </form>
                                                             </div>
                                                         </td>
@@ -717,7 +729,7 @@
                                 y: {
                                     ticks: {
                                         callback: function (value) {
-                                            return '$' + Number(value).toLocaleString();
+                                            return '৳' + Number(value).toLocaleString();
                                         }
                                     }
                                 }

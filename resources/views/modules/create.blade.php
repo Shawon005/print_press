@@ -8,16 +8,36 @@
     </head>
     <body class="font-sans">
         @php
+            $locale = session('locale', 'en');
+            $biMap = [
+                'Module Form' => 'মডিউল ফর্ম',
+                'Back to' => 'ফিরুন',
+                'Select' => 'নির্বাচন করুন',
+                'Update Record' => 'রেকর্ড আপডেট',
+                'Save Record' => 'রেকর্ড সেভ',
+                'Cancel' => 'বাতিল',
+                'Select a Job Order to auto-fill subtotal with remaining amount.' => 'বাকি টাকার ভিত্তিতে সাবটোটাল অটো-ফিল করতে জব অর্ডার নির্বাচন করুন।',
+                'Loading order balance...' => 'অর্ডারের ব্যালেন্স লোড হচ্ছে...',
+                'Could not load remaining amount for this job order.' => 'এই জব অর্ডারের বাকি টাকা লোড করা যায়নি।',
+                'Order Total' => 'অর্ডার মোট',
+                'Paid' => 'পরিশোধিত',
+                'Remaining' => 'বাকি',
+            ];
+            $bi = function (string $en) use ($locale, $biMap): string {
+                if ($locale !== 'bn') return $en;
+                $bn = $biMap[$en] ?? null;
+                return $bn ? ($en . '/' . $bn) : $en;
+            };
             $moduleBackPage = in_array($module, ['paper-types', 'ink-types', 'standard-sheets', 'units'], true) ? 'settings' : $module;
         @endphp
         <div class="min-h-screen bg-[var(--app-bg)] px-4 py-8 md:px-8">
             <div class="mx-auto max-w-5xl">
                 <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">Module Form</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">{{ $bi('Module Form') }}</p>
                         <h1 class="text-3xl font-black tracking-tight text-slate-900">{{ $config['title'] }}</h1>
                     </div>
-                    <a href="{{ $module === 'dashboard' ? route('portal.home') : route('portal.page', $moduleBackPage) }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Back to {{ str($moduleBackPage)->headline() }}</a>
+                    <a href="{{ $module === 'dashboard' ? route('portal.home') : route('portal.page', $moduleBackPage) }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $bi('Back to') }} {{ str($moduleBackPage)->headline() }}</a>
                 </div>
 
                 <div class="surface-card p-6 md:p-8">
@@ -28,14 +48,14 @@
                             @endif
                             @foreach ($config['fields'] as $field)
                             <div class="{{ ($field['type'] ?? 'text') === 'textarea' ? 'md:col-span-2' : '' }}">
-                                <label for="{{ $field['name'] }}" class="mb-2 block text-sm font-semibold text-slate-700">{{ $field['label'] }}</label>
+                                <label for="{{ $field['name'] }}" class="mb-2 block text-sm font-semibold text-slate-700">{{ $bi($field['label']) }}</label>
                                 @if (($field['type'] ?? 'text') === 'select')
                                     @php
                                         $selectOptions = $field['options'] ?? ($options[$field['source']] ?? []);
                                     @endphp
                                     <select id="{{ $field['name'] }}" name="{{ $field['name'] }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         @if (!empty($field['nullable']))
-                                            <option value="">Select</option>
+                                            <option value="">{{ $bi('Select') }}</option>
                                         @endif
                                         @foreach ($selectOptions as $value => $label)
                                             <option value="{{ $value }}" @selected(old($field['name'], $record?->{$field['name']}) == $value)>{{ $label }}</option>
@@ -59,14 +79,14 @@
                         @if ($module === 'invoices')
                             <div class="md:col-span-2">
                                 <p id="invoice-job-order-summary" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                                    Select a Job Order to auto-fill subtotal with remaining amount.
+                                    {{ $bi('Select a Job Order to auto-fill subtotal with remaining amount.') }}
                                 </p>
                             </div>
                         @endif
 
                         <div class="md:col-span-2 flex flex-wrap gap-3 pt-2">
-                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $record ? 'Update Record' : 'Save Record' }}</button>
-                            <a href="{{ $module === 'dashboard' ? route('portal.home') : route('portal.page', $moduleBackPage) }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">Cancel</a>
+                            <button type="submit" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $record ? $bi('Update Record') : $bi('Save Record') }}</button>
+                            <a href="{{ $module === 'dashboard' ? route('portal.home') : route('portal.page', $moduleBackPage) }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">{{ $bi('Cancel') }}</a>
                         </div>
                     </form>
                 </div>
@@ -89,11 +109,11 @@
                     jobOrderSelect.addEventListener('change', async function () {
                         const jobOrderId = jobOrderSelect.value;
                         if (!jobOrderId) {
-                            summary.textContent = 'Select a Job Order to auto-fill subtotal with remaining amount.';
+                            summary.textContent = @json($bi('Select a Job Order to auto-fill subtotal with remaining amount.'));
                             return;
                         }
 
-                        summary.textContent = 'Loading order balance...';
+                        summary.textContent = @json($bi('Loading order balance...'));
 
                         try {
                             const response = await fetch(`{{ url('/invoices/job-orders') }}/${jobOrderId}/summary`);
@@ -109,9 +129,9 @@
                             }
 
                             summary.textContent =
-                                `Order Total: ${currency.format(payload.total_amount || 0)} | Paid: ${currency.format(payload.paid_amount || 0)} | Remaining: ${currency.format(payload.remaining_amount || 0)}`;
+                                `${@json($bi('Order Total'))}: ${currency.format(payload.total_amount || 0)} | ${@json($bi('Paid'))}: ${currency.format(payload.paid_amount || 0)} | ${@json($bi('Remaining'))}: ${currency.format(payload.remaining_amount || 0)}`;
                         } catch (error) {
-                            summary.textContent = 'Could not load remaining amount for this job order.';
+                            summary.textContent = @json($bi('Could not load remaining amount for this job order.'));
                         }
                     });
                 });
