@@ -12,6 +12,8 @@
                 return ($locale ?? 'en') === 'bn' ? $bn : $en;
             };
         @endphp
+        
+
         <div class="min-h-screen bg-[var(--app-bg)] text-slate-900">
             <div class="app-shell mx-auto min-h-screen max-w-[1680px]">
                 <aside class="app-sidebar border-r border-slate-200 bg-white/92 px-5 py-6 backdrop-blur">
@@ -118,6 +120,7 @@
                                         <option value="{{ route('portal.language', ['locale' => 'bn']) }}" @selected($locale === 'bn')>{{ $ui['bangla'] }}</option>
                                     </select>
                                 </div>
+                                <button command="show-modal" commandfor="dialog" type="button"  class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Unit Converter</button>
                                 <a href="{{ $workspace['company_profile_url'] }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['company_profile'] }}</a>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
@@ -383,44 +386,44 @@
                                     </div>
                                     <form id="die-generate-form" class="grid gap-4 md:grid-cols-4">
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Width (in)</span>
-                                            <input type="number" step="0.01" min="0.01" name="body_width_in" value="2.36" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Width (mm)</span>
+                                            <input type="number" step="0.01" min="0.01" name="body_width_mm" value="60" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Height (in)</span>
-                                            <input type="number" step="0.01" min="0.01" name="body_height_in" value="3.54" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Height (mm)</span>
+                                            <input type="number" step="0.01" min="0.01" name="body_height_mm" value="90" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Top Flap (in)</span>
-                                            <input type="number" step="0.01" min="0" name="top_flap_in" value="0.79" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Top Flap (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="top_flap_mm" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bottom Flap (in)</span>
-                                            <input type="number" step="0.01" min="0" name="bottom_flap_in" value="0.79" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bottom Flap (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="bottom_flap_mm" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Side Flap (in)</span>
-                                            <input type="number" step="0.01" min="0" name="side_flap_in" value="0.63" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Side Flap (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="side_flap_mm" value="16" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Glue Flap (in)</span>
-                                            <input type="number" step="0.01" min="0" name="glue_flap_in" value="0.47" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Glue Flap (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="glue_flap_mm" value="12" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bleed (in)</span>
-                                            <input type="number" step="0.01" min="0" name="bleed_in" value="0.12" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Bleed (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="bleed_mm" value="3" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Gap (in)</span>
-                                            <input type="number" step="0.01" min="0" name="gap_in" value="0.10" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Gap (mm)</span>
+                                            <input type="number" step="0.01" min="0" name="gap_mm" value="2.54" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width (in)</span>
-                                            <input type="number" step="0.01" min="1" name="sheet_width_in" value="30" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width (mm)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_width_mm" value="762" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height (in)</span>
-                                            <input type="number" step="0.01" min="1" name="sheet_height_in" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height (mm)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_height_mm" value="508" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <div class="md:col-span-2 flex items-end gap-3">
                                             <button type="button" id="btn-generate-die" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Generate Shape</button>
@@ -655,6 +658,51 @@
                 </main>
             </div>
         </div>
+
+<el-dialog>
+  <dialog id="dialog" aria-labelledby="dialog-title" class="fixed inset-0  size-auto max-h-none max-w-none overflow-y-auto bg-transparent backdrop:bg-transparent" style="margin:auto; padding:20px; border-radius:16px;">
+        <div id="unit-converter-modal"  class="fixed inset-0 z-[9999] bg-black/45">
+            <div class="mx-auto mt-16 w-[94%] max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" style="width:500px;">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3  class="text-lg font-bold text-slate-900">Unit Converter</h3>
+                    <button id="close-unit-converter" type="button"command="close" commandfor="dialog" class="rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-600">Close</button>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-semibold text-slate-600">From</span>
+                        <select id="converter-from" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                            <option value="in">Inch (in)</option>
+                            <option value="mm">Millimeter (mm)</option>
+                            <option value="cm">Centimeter (cm)</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-semibold text-slate-600">To</span>
+                        <select id="converter-to" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                            <option value="mm">Millimeter (mm)</option>
+                            <option value="in">Inch (in)</option>
+                            <option value="cm">Centimeter (cm)</option>
+                        </select>
+                    </label>
+                </div>
+                <label class="mt-4 block">
+                    <span class="mb-1 block text-sm font-semibold text-slate-600">Input Value</span>
+                    <input id="converter-input" type="number" step="any" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Enter value">
+                </label>
+                <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase text-emerald-700">Result</p>
+                    <p id="converter-output" class="text-lg font-bold text-emerald-800">-</p>
+                </div>
+            </div>
+        </div>
+
+
+  </dialog>
+</el-dialog>
+       
+
+
+      
         @if ($currentPage === 'quotations')
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
@@ -680,6 +728,63 @@
                 });
             </script>
         @endif
+        <script>
+            function toggleUnitConverter(open) {
+                const modal = document.getElementById('unit-converter-modal');
+                if (!modal) return;
+                const isOpen = modal.style.display === 'block';
+                if (typeof open === 'boolean') {
+                    modal.style.display = open ? 'block' : 'none';
+                } else {
+                    modal.style.display = isOpen ? 'none' : 'block';
+                }
+            }
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const converterModal = document.getElementById('unit-converter-modal');
+                const converterOpen = document.getElementById('open-unit-converter');
+                const converterClose = document.getElementById('close-unit-converter');
+                const converterInput = document.getElementById('converter-input');
+                const converterFrom = document.getElementById('converter-from');
+                const converterTo = document.getElementById('converter-to');
+                const converterOutput = document.getElementById('converter-output');
+
+                function toMm(value, unit) {
+                    if (unit === 'mm') return value;
+                    if (unit === 'cm') return value * 10;
+                    return value * 25.4;
+                }
+
+                function fromMm(value, unit) {
+                    if (unit === 'mm') return value;
+                    if (unit === 'cm') return value / 10;
+                    return value / 25.4;
+                }
+
+                function runConversion() {
+                    const raw = Number(converterInput.value);
+                    if (!Number.isFinite(raw)) {
+                        converterOutput.textContent = '-';
+                        return;
+                    }
+                    const mm = toMm(raw, converterFrom.value);
+                    const out = fromMm(mm, converterTo.value);
+                    converterOutput.textContent = out.toFixed(4) + ' ' + converterTo.value;
+                }
+
+                if (converterOpen && converterClose && converterModal) {
+                    converterModal.addEventListener('click', function (e) {
+                        if (e.target === converterModal) toggleUnitConverter(false);
+                    });
+                }
+
+                [converterInput, converterFrom, converterTo].forEach(function (el) {
+                    if (el) el.addEventListener('input', runConversion);
+                    if (el) el.addEventListener('change', runConversion);
+                });
+            });
+        </script>
         @if ($currentPage === 'reports' && !empty($pageData['chart']))
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <script>
@@ -842,9 +947,9 @@
                         const fd = new FormData(document.getElementById('die-generate-form'));
                         const payload = {
                             die_shape_id: activeShapeId,
-                            sheet_width_in: Number(fd.get('sheet_width_in')),
-                            sheet_height_in: Number(fd.get('sheet_height_in')),
-                            gap_in: Number(fd.get('gap_in')),
+                            sheet_width_mm: Number(fd.get('sheet_width_mm')),
+                            sheet_height_mm: Number(fd.get('sheet_height_mm')),
+                            gap_mm: Number(fd.get('gap_mm')),
                             allow_mirror: true
                         };
                         const res = await post(api.calculate_layout, payload);

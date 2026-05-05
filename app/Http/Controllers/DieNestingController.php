@@ -24,23 +24,30 @@ class DieNestingController extends Controller
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'body_width_in' => ['required', 'numeric', 'min:0.01'],
-            'body_height_in' => ['required', 'numeric', 'min:0.01'],
-            'top_flap_in' => ['required', 'numeric', 'min:0'],
-            'bottom_flap_in' => ['required', 'numeric', 'min:0'],
-            'side_flap_in' => ['required', 'numeric', 'min:0'],
-            'glue_flap_in' => ['required', 'numeric', 'min:0'],
+            'body_width_mm' => ['nullable', 'numeric', 'min:0.01'],
+            'body_height_mm' => ['nullable', 'numeric', 'min:0.01'],
+            'top_flap_mm' => ['nullable', 'numeric', 'min:0'],
+            'bottom_flap_mm' => ['nullable', 'numeric', 'min:0'],
+            'side_flap_mm' => ['nullable', 'numeric', 'min:0'],
+            'glue_flap_mm' => ['nullable', 'numeric', 'min:0'],
+            'bleed_mm' => ['nullable', 'numeric', 'min:0'],
+            'body_width_in' => ['nullable', 'numeric', 'min:0.01'],
+            'body_height_in' => ['nullable', 'numeric', 'min:0.01'],
+            'top_flap_in' => ['nullable', 'numeric', 'min:0'],
+            'bottom_flap_in' => ['nullable', 'numeric', 'min:0'],
+            'side_flap_in' => ['nullable', 'numeric', 'min:0'],
+            'glue_flap_in' => ['nullable', 'numeric', 'min:0'],
             'bleed_in' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $mm = [
-            'body_width_mm' => (float) $data['body_width_in'] * 25.4,
-            'body_height_mm' => (float) $data['body_height_in'] * 25.4,
-            'top_flap_mm' => (float) $data['top_flap_in'] * 25.4,
-            'bottom_flap_mm' => (float) $data['bottom_flap_in'] * 25.4,
-            'side_flap_mm' => (float) $data['side_flap_in'] * 25.4,
-            'glue_flap_mm' => (float) $data['glue_flap_in'] * 25.4,
-            'bleed_mm' => (float) ($data['bleed_in'] ?? 0) * 25.4,
+            'body_width_mm' => $this->resolveMm($data, 'body_width_mm', 'body_width_in'),
+            'body_height_mm' => $this->resolveMm($data, 'body_height_mm', 'body_height_in'),
+            'top_flap_mm' => $this->resolveMm($data, 'top_flap_mm', 'top_flap_in', 0.0),
+            'bottom_flap_mm' => $this->resolveMm($data, 'bottom_flap_mm', 'bottom_flap_in', 0.0),
+            'side_flap_mm' => $this->resolveMm($data, 'side_flap_mm', 'side_flap_in', 0.0),
+            'glue_flap_mm' => $this->resolveMm($data, 'glue_flap_mm', 'glue_flap_in', 0.0),
+            'bleed_mm' => $this->resolveMm($data, 'bleed_mm', 'bleed_in', 0.0),
         ];
 
         $points = $this->geometry->generateCartonPolygon($mm);
@@ -102,17 +109,32 @@ class DieNestingController extends Controller
     {
         $data = $request->validate([
             'die_shape_id' => ['required', 'integer', 'exists:die_shapes,id'],
-            'sheet_width_in' => ['required', 'numeric', 'min:1'],
-            'sheet_height_in' => ['required', 'numeric', 'min:1'],
+            'sheet_width_mm' => ['nullable', 'numeric', 'min:1'],
+            'sheet_height_mm' => ['nullable', 'numeric', 'min:1'],
+            'gap_mm' => ['nullable', 'numeric', 'min:0'],
+            'sheet_width_in' => ['nullable', 'numeric', 'min:1'],
+            'sheet_height_in' => ['nullable', 'numeric', 'min:1'],
             'gap_in' => ['nullable', 'numeric', 'min:0'],
             'allow_mirror' => ['nullable', 'boolean'],
         ]);
 
         $shape = DieShape::findOrFail($data['die_shape_id']);
-        $sheetW = (float) $data['sheet_width_in'] * 25.4;
-        $sheetH = (float) $data['sheet_height_in'] * 25.4;
-        $gap = max((float) ($data['gap_in'] ?? 0.1), 0.0) * 25.4;
+        $sheetW = $this->resolveMm($data, 'sheet_width_mm', 'sheet_width_in');
+        $sheetH = $this->resolveMm($data, 'sheet_height_mm', 'sheet_height_in');
+        $gap = max($this->resolveMm($data, 'gap_mm', 'gap_in', 2.54), 0.0);
         $nest = $this->nesting->nest($shape->polygon_points_mm, $sheetW, $sheetH, $gap, (bool) ($data['allow_mirror'] ?? false));
+        if ($shape->source === 'generated' && is_array($shape->dimensions_mm)) {
+            $cartonNest = $this->nesting->nestCartonInterlockedByDimensions(
+                $shape->polygon_points_mm,
+                $shape->dimensions_mm,
+                $sheetW,
+                $sheetH,
+                $gap
+            );
+            if ($cartonNest && ($cartonNest['box_count'] ?? 0) > ($nest['box_count'] ?? 0)) {
+                $nest = $cartonNest;
+            }
+        }
 
         $sheetArea = $sheetW * $sheetH;
         $used = (float) $nest['used_area_mm2'];
@@ -124,7 +146,7 @@ class DieNestingController extends Controller
         $layout = DieLayout::create([
             'tenant_id' => Tenant::first()?->id,
             'die_shape_id' => $shape->id,
-            'layout_mode' => $nest['layout_mode'],
+            'layout_mode' => (string) ($nest['layout_mode_detail'] ?? $nest['layout_mode']),
             'sheet_width_mm' => $sheetW,
             'sheet_height_mm' => $sheetH,
             'box_count' => $nest['box_count'],
@@ -235,5 +257,16 @@ class DieNestingController extends Controller
         }
 
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . round($sheetW, 3) . ' ' . round($sheetH, 3) . '" width="' . round($sheetW, 3) . 'mm" height="' . round($sheetH, 3) . 'mm"><rect x="0" y="0" width="' . round($sheetW, 3) . '" height="' . round($sheetH, 3) . '" fill="#fff" stroke="#111827" stroke-width="0.8" />' . implode('', $paths) . '</svg>';
+    }
+
+    private function resolveMm(array $data, string $mmKey, string $inKey, ?float $default = null): float
+    {
+        if (isset($data[$mmKey]) && $data[$mmKey] !== null && $data[$mmKey] !== '') {
+            return (float) $data[$mmKey];
+        }
+        if (isset($data[$inKey]) && $data[$inKey] !== null && $data[$inKey] !== '') {
+            return (float) $data[$inKey] * 25.4;
+        }
+        return (float) ($default ?? 0.0);
     }
 }

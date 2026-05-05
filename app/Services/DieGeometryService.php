@@ -16,32 +16,40 @@ class DieGeometryService
 
         // Carton-style die following the provided sample style:
         // total flat width = (2 * bodyW) + (2 * side) + glue
-        // one major top flap and one major bottom flap are on a single body panel area,
-        // while side areas keep only body height (no full mirrored top/bottom flap blocks).
+        // Includes top/bottom side flaps on both sides with computed angled cuts
+        // (matching the hand-marked sample tabs).
         $x0 = 0.0;
         $x1 = $glue;
         $x2 = $x1 + $side;
         $x3 = $x2 + $bodyW;
-        $x4 = $x3 + $bodyW;
-        $x5 = $x4 + $side;
+        $x4 = $x3 + $side;
+        $x5 = $x4 + $bodyW;
         $y0 = 0.0;
         $y1 = $top;
         $y2 = $top + $bodyH;
         $y3 = $y2 + $bottom;
-
+        $miniInsetTop = min($top * 0.18, $top);
+        $miniInsetBottom = min($bottom * 0.18, $bottom);
         $poly = [
             ['x' => $x0, 'y' => $y1],
-            ['x' => $x2, 'y' => $y1],
+            ['x' => $x1, 'y' => $y1],
+            // Top mini-left + top flap + top mini-right (one-side flap block)
+            ['x' => $x1, 'y' => $y0 +$miniInsetTop],
             ['x' => $x2, 'y' => $y0],
             ['x' => $x3, 'y' => $y0],
-            ['x' => $x3, 'y' => $y1],
+            ['x' => $x4, 'y' => $y0 + $miniInsetTop],
+            ['x' => $x4, 'y' => $y1],
             ['x' => $x5, 'y' => $y1],
             ['x' => $x5, 'y' => $y2],
-            ['x' => $x3, 'y' => $y2],
+            ['x' => $x4, 'y' => $y2],       
+            // Bottom mini-right + bottom flap + bottom mini-left (one-side flap block)
+            ['x' => $x4, 'y' => $y3 - $miniInsetBottom],
             ['x' => $x3, 'y' => $y3],
             ['x' => $x2, 'y' => $y3],
-            ['x' => $x2, 'y' => $y2],
+            ['x' => $x1, 'y' => $y3 - $miniInsetBottom],
+            ['x' => $x1, 'y' => $y2],
             ['x' => $x0, 'y' => $y2],
+            
         ];
 
         if ($bleed > 0) {
@@ -59,7 +67,7 @@ class DieGeometryService
             }, $poly);
         }
 
-        return $this->normalizePolygon($poly);
+        return $this->normalizePolygon($this->sanitizePolygon($poly));
     }
 
     public function normalizePolygon(array $points): array
@@ -177,5 +185,28 @@ class DieGeometryService
         $dots = array_map(fn ($p) => $p['x'] * $axisX + $p['y'] * $axisY, $poly);
 
         return [min($dots), max($dots)];
+    }
+
+    private function sanitizePolygon(array $points): array
+    {
+        $clean = [];
+        foreach ($points as $p) {
+            $x = round((float) $p['x'], 6);
+            $y = round((float) $p['y'], 6);
+            $last = end($clean);
+            if ($last !== false && abs($last['x'] - $x) < 0.000001 && abs($last['y'] - $y) < 0.000001) {
+                continue;
+            }
+            $clean[] = ['x' => $x, 'y' => $y];
+        }
+        if (count($clean) > 1) {
+            $first = $clean[0];
+            $last = end($clean);
+            if (abs($first['x'] - $last['x']) < 0.000001 && abs($first['y'] - $last['y']) < 0.000001) {
+                array_pop($clean);
+            }
+        }
+
+        return $clean;
     }
 }
