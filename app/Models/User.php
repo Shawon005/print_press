@@ -75,4 +75,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(CustomerInteraction::class);
     }
+
+    public function hasPermission(string $permissionName): bool
+    {
+        $this->loadMissing(['permissions:id,name', 'roles.permissions:id,name']);
+
+        if ($this->permissions->contains(fn (Permission $permission) => $permission->name === $permissionName)) {
+            return true;
+        }
+
+        return $this->roles->contains(function (Role $role) use ($permissionName): bool {
+            return $role->permissions->contains(fn (Permission $permission) => $permission->name === $permissionName);
+        });
+    }
+
+    public function canAccessSection(string $section): bool
+    {
+        return $this->hasPermission($section . '.view');
+    }
 }

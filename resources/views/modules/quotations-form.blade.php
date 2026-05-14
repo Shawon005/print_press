@@ -48,7 +48,8 @@
             </div>
 
             <div class="rounded-2xl border border-slate-200 overflow-hidden">
-                <table class="min-w-full text-sm" @input="recalc()">
+                <div class="table-responsive">
+                <table class="min-w-[980px] text-sm" @input="recalc()">
                     <thead class="bg-slate-100">
                     <tr>
                         <th class="px-3 py-3 text-left">SL</th>
@@ -75,6 +76,7 @@
                     </template>
                     </tbody>
                 </table>
+                </div>
                 <div class="border-t border-slate-200 p-3">
                     <button type="button" @click="add()" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">+ Add Row</button>
                 </div>

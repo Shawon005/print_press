@@ -26,9 +26,11 @@
             radial-gradient(circle at top right, rgba(16, 185, 129, 0.1), transparent 24%),
             linear-gradient(180deg, #f7faff 0%, #eef4ff 50%, #ecf2fb 100%);
     }
+
 }
 
 @layer components {
+
     .app-shell {
         @apply grid lg:grid-cols-[290px_minmax(0,1fr)];
     }
@@ -106,4 +108,37 @@
         background: linear-gradient(135deg, #0f172a, #1e3a8a);
         box-shadow: 0 28px 80px rgba(30, 58, 138, 0.35);
     }
+
+    .table-responsive {
+        @apply overflow-x-auto;
+        
+    }
+
+    .mobile-bottom-nav {
+        @apply fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 gap-1 border-t border-slate-200 bg-white px-2 py-1.5;
+        box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    .mobile-bottom-link {
+        @apply flex flex-col items-center justify-center rounded-xl px-1 py-1.5 text-center text-slate-500;
+    }
+
+    .mobile-bottom-icon {
+        @apply mb-0.5 block h-5 w-5;
+    }
+
+    .mobile-bottom-icon svg {
+        @apply h-5 w-5;
+    }
+
+    .mobile-bottom-label {
+        @apply text-[11px] font-medium leading-none;
+    }
+
+    .mobile-bottom-link.is-active {
+        @apply bg-slate-100 text-slate-900;
+    }
+
+
+    
 }

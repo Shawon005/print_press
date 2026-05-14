@@ -41,12 +41,15 @@ class PortalController extends Controller
     public function show(Request $request, string $page): View
     {
         abort_unless(array_key_exists($page, $this->pages()), 404);
+        $this->authorizePageAccess($request, $page);
 
         return $this->renderPage($page, $request);
     }
 
     public function customerReport(Customer $customer): View
     {
+        abort_unless(request()->user()?->hasPermission('reports.view'), 403, 'You do not have permission to access this report.');
+
         $tenant = Tenant::firstOrFail();
         abort_unless((int) $customer->tenant_id === (int) $tenant->id, 404);
 
@@ -164,8 +167,8 @@ class PortalController extends Controller
             Setting::where('tenant_id', $tenant->id)->where('key', 'company_profile')->first()
         )->value_json;
         $companyName = $companyProfile['company_name'] ?? $tenant->name;
-        $primaryUser = User::where('tenant_id', $tenant->id)->first();
-        $pages = $this->pages();
+        $authUser = $request?->user();
+        $pages = $this->visiblePages($authUser);
         $pageData = array_merge($this->pageData($page, $tenant, $request), $this->pageActions($page));
         if ($this->locale === 'bn') {
             $pageData = $this->translateDeep($pageData);
@@ -182,8 +185,8 @@ class PortalController extends Controller
                 'company_tagline' => $companyProfile['tagline'] ?? null,
                 'company_logo' => $companyProfile['logo_url'] ?? $tenant->logo,
                 'company_profile_url' => route('company-profile.edit'),
-                'role' => $this->t('Tenant Owner'),
-                'user' => $primaryUser?->name ?? $this->t('Workspace User'),
+                'role' => $authUser?->roles()->value('name') ?? $this->t('Workspace User'),
+                'user' => $authUser?->name ?? $this->t('Workspace User'),
                 'status' => $tenant->is_active ? $this->t('Workspace Active') : $this->t('Workspace Inactive'),
             ],
             'locale' => $this->locale,
@@ -196,6 +199,59 @@ class PortalController extends Controller
                 'navigation' => $this->t('Navigation'),
             ],
         ]);
+    }
+
+    private function authorizePageAccess(Request $request, string $page): void
+    {
+        $section = $this->pageSection($page);
+        if (! $section) {
+            return;
+        }
+
+        abort_unless($request->user()?->canAccessSection($section), 403, 'You do not have permission to access this section.');
+    }
+
+    private function visiblePages(?User $user): array
+    {
+        $all = $this->pages();
+        if (! $user) {
+            return $all;
+        }
+
+        return collect($all)
+            ->filter(function ($meta, $page) use ($user): bool {
+                $section = $this->pageSection((string) $page);
+                if (! $section) {
+                    return true;
+                }
+
+                return $user->canAccessSection($section);
+            })
+            ->all();
+    }
+
+    private function pageSection(string $page): ?string
+    {
+        return [
+            'dashboard' => null,
+            'customers' => 'customers',
+            'suppliers' => 'suppliers',
+            'products' => 'products',
+            'raw-materials' => 'raw-materials',
+            'warehouses' => 'warehouses',
+            'quotations' => 'quotations',
+            'orders' => 'orders',
+            'purchases' => 'purchases',
+            'invoices' => 'invoices',
+            'expenses' => 'expenses',
+            'deliveries' => 'deliveries',
+            'reports' => 'reports',
+            'printing' => null,
+            'printing-rectangle' => null,
+            'users-roles' => 'users',
+            'settings' => null,
+            'subscription' => null,
+        ][$page] ?? null;
     }
 
     private function pages(): array
@@ -351,6 +407,25 @@ class PortalController extends Controller
             'Purchase Payables' => 'ক্রয় বকেয়া (পেয়াবল)',
             'Daily' => 'দৈনিক',
             'Live' => 'লাইভ',
+            'Invoice Date' => 'ইনভয়েস তারিখ',
+            'Due Date' => 'বকেয়া তারিখ',
+            'Total' => 'মোট',
+            'Payment Status' => 'পেমেন্ট স্ট্যাটাস',
+            'Invoice register' => 'ইনভয়েস রেজিস্টার',
+            'Category' => 'বিভাগ',
+            'Title' => 'শিরোনাম',
+            'Reference' => 'রেফারেন্স',
+            'Amount' => 'পরিমাণ',
+            'Company' => 'কোম্পানি',
+            'Contact Person' => 'যোগাযোগের ব্যক্তি',
+            'City' => 'শহর',
+            'Job Title' => 'কাজের শিরোনাম',
+            'Delivery Date' => 'ডেলিভারি তারিখ',
+            'Order' => 'অর্ডার',
+            'Order board' => 'অর্ডার বোর্ড',
+            'Quote No' => 'কোটেশন নম্বর',
+            'Inquiry Date' => 'অনুসন্ধানের তারিখ',
+            'Valid Until' => 'যতক্ষণ বৈধ',
         ];
 
         return $map[$text] ?? $text;
@@ -1458,4 +1533,3 @@ class PortalController extends Controller
         ];
     }
 }
-

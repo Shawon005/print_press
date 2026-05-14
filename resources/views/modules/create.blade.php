@@ -47,9 +47,46 @@
                                 @method($formMethod)
                             @endif
                             @foreach ($config['fields'] as $field)
-                            <div class="{{ ($field['type'] ?? 'text') === 'textarea' ? 'md:col-span-2' : '' }}">
+                            <div class="{{ in_array(($field['type'] ?? 'text'), ['textarea', 'checkbox_group'], true) ? 'md:col-span-2' : '' }}">
                                 <label for="{{ $field['name'] }}" class="mb-2 block text-sm font-semibold text-slate-700">{{ $bi($field['label']) }}</label>
-                                @if (($field['type'] ?? 'text') === 'select')
+                                @if (($field['type'] ?? 'text') === 'checkbox_group')
+                                    @php
+                                        $groupedOptions = $field['options'] ?? ($options[$field['source']] ?? []);
+                                        $selectedValues = collect(old($field['name'], $record?->permissions?->pluck('id')->all() ?? []))
+                                            ->map(fn ($value) => (string) $value)
+                                            ->all();
+                                    @endphp
+                                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-permission-root>
+                                        <div class="mb-4 flex items-center justify-between gap-3">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Section Access</p>
+                                            <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700" data-toggle-all>Toggle All</button>
+                                        </div>
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            @foreach ($groupedOptions as $section => $sectionOptions)
+                                                <div class="rounded-xl border border-slate-200 bg-white p-3" data-section-card>
+                                                    <div class="mb-2 flex items-center justify-between gap-2">
+                                                        <p class="text-sm font-bold text-slate-800">{{ $section }}</p>
+                                                        <button type="button" class="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-600" data-section-toggle>Toggle</button>
+                                                    </div>
+                                                    <div class="grid gap-2 sm:grid-cols-2">
+                                                        @foreach ($sectionOptions as $value => $label)
+                                                            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="{{ $field['name'] }}[]"
+                                                                    value="{{ $value }}"
+                                                                    @checked(in_array((string) $value, $selectedValues, true))
+                                                                    class="rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                                                >
+                                                                <span>{{ $label }}</span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @elseif (($field['type'] ?? 'text') === 'select')
                                     @php
                                         $selectOptions = $field['options'] ?? ($options[$field['source']] ?? []);
                                     @endphp
@@ -133,6 +170,33 @@
                         } catch (error) {
                             summary.textContent = @json($bi('Could not load remaining amount for this job order.'));
                         }
+                    });
+                });
+            </script>
+        @endif
+        @if ($module === 'roles')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const root = document.querySelector('[data-permission-root]');
+                    if (!root) return;
+
+                    const allCheckboxes = () => Array.from(root.querySelectorAll('input[type="checkbox"]'));
+                    const toggleCheckedState = (checkboxes) => {
+                        const shouldCheck = checkboxes.some((box) => !box.checked);
+                        checkboxes.forEach((box) => { box.checked = shouldCheck; });
+                    };
+
+                    root.querySelector('[data-toggle-all]')?.addEventListener('click', function () {
+                        toggleCheckedState(allCheckboxes());
+                    });
+
+                    root.querySelectorAll('[data-section-toggle]').forEach((button) => {
+                        button.addEventListener('click', function () {
+                            const card = button.closest('[data-section-card]');
+                            if (!card) return;
+                            const checkboxes = Array.from(card.querySelectorAll('input[type="checkbox"]'));
+                            toggleCheckedState(checkboxes);
+                        });
                     });
                 });
             </script>

@@ -109,7 +109,7 @@
                             </div>
 
                             <div class="flex flex-wrap items-center gap-3">
-                                <button class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                                <button class="mble-block inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
                                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                                     {{ $workspace['status'] }}
                                 </button>
@@ -120,13 +120,13 @@
                                         <option value="{{ route('portal.language', ['locale' => 'bn']) }}" @selected($locale === 'bn')>{{ $ui['bangla'] }}</option>
                                     </select>
                                 </div>
-                                <button command="show-modal" commandfor="dialog" type="button"  class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Unit Converter</button>
-                                <a href="{{ $workspace['company_profile_url'] }}" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['company_profile'] }}</a>
+                                <button command="show-modal" commandfor="dialog" type="button"  class="mble-block rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">Unit Converter</button>
+                                <a href="{{ $workspace['company_profile_url'] }}" class="mble-block rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['company_profile'] }}</a>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <button type="submit" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">{{ $ui['logout'] }}</button>
                                 </form>
-                                <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                                <div class="mble-block flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
                                     @if (!empty($workspace['company_logo']))
                                         <img src="{{ $workspace['company_logo'] }}" alt="Company logo" class="h-11 w-11 rounded-full border border-slate-200 object-cover">
                                     @else
@@ -134,7 +134,7 @@
                                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
                                         </div>
                                     @endif
-                                    <div>
+                                    <div class="">
                                         <p class="text-sm font-bold text-slate-900">{{ $workspace['user'] }}</p>
                                         <p class="text-xs text-slate-500">{{ $workspace['company_name'] }}</p>
                                         <p class="text-xs text-slate-400">{{ $workspace['role'] }}</p>
@@ -144,7 +144,7 @@
                         </div>
                     </header>
 
-                    <div class="space-y-6 px-5 py-6 md:px-8">
+                    <div class="space-y-6 px-5 py-6 pb-24 md:px-8 md:pb-8">
                         @if (session('success'))
                             <div class="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
                                 {{ session('success') }}
@@ -220,8 +220,9 @@
                                             <div class="mb-4 flex justify-end">
                                                 <a href="{{ $tab['create_url'] }}" class="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">{{ $L('Add', 'যোগ করুন') }} {{ $tab['label'] }}</a>
                                             </div>
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full border-separate border-spacing-y-3 text-left">
+                                            
+                                            <div class="table-responsive">
+                                                <table class=" border-separate border-spacing-y-3 text-left ">
                                                     <thead>
                                                         <tr class="text-sm font-semibold text-slate-500">
                                                             @foreach ($tab['columns'] as $column)
@@ -453,8 +454,8 @@
                                                 <a id="die-export-svg" href="#" target="_blank" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700">Export SVG</a>
                                                 <a id="die-export-pdf" href="#" target="_blank" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700">Export PDF</a>
                                             </div>
-                                            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
-                                                <table class="min-w-full text-xs">
+                                            <div class="table-responsive mt-4 rounded-xl border border-slate-200">
+                                                <table class="min-w-[420px] text-xs md:min-w-full">
                                                     <thead class="bg-slate-100 text-slate-600">
                                                         <tr>
                                                             <th class="px-2 py-2 text-left">Metric</th>
@@ -498,8 +499,8 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-6 overflow-x-auto">
-                                    <table class="min-w-full border-separate border-spacing-y-3 text-left">
+                                <div class="table-responsive mt-6">
+                                    <table class=" border-separate border-spacing-y-3 text-left">
                                         <thead>
                                             <tr class="text-sm font-semibold text-slate-500">
                                                 @if ($currentPage === 'quotations' && !empty($pageData['table']['record_ids']))
@@ -590,8 +591,8 @@
                                         @endif
                                     </div>
 
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full border-separate border-spacing-y-3 text-left">
+                                    <div class="table-responsive">
+                                        <table class="border-separate border-spacing-y-3 text-left">
                                             <thead>
                                                 <tr class="text-sm font-semibold text-slate-500">
                                                     @foreach ($pageData['secondary_table']['columns'] as $column)
@@ -635,7 +636,7 @@
                                 </article>
                             @endif
 
-                            <!-- <div class="space-y-6">
+                            {{-- <div class="space-y-6">
                                 <article class="surface-card p-6">
                                     <p class="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--brand)]">Module Scope</p>
                                     <h3 class="text-2xl font-black tracking-tight text-slate-900">{{ $pageData['side_panel']['title'] }}</h3>
@@ -651,13 +652,36 @@
                                     <h3 class="text-2xl font-black tracking-tight text-slate-900">Blueprint-aligned page design</h3>
                                     <p class="mt-4 text-sm leading-7 text-slate-600">This page is one part of the wider Printing Press Management System and follows the role, module, reporting, and workflow structure from your original prompt rather than a generic admin dashboard.</p>
                                 </article>
-                            </div> -->
+                            </div> --}}
                         </section>
                         @endif
                     </div>
                 </main>
             </div>
         </div>
+
+        <nav class="mobile-bottom-nav md:hidden">
+            @foreach (['dashboard', 'orders', 'customers', 'invoices', 'reports'] as $mobileKey)
+                @if (!empty($pages[$mobileKey]))
+                    <a href="{{ $mobileKey === 'dashboard' ? route('portal.home') : route('portal.page', $mobileKey) }}" class="mobile-bottom-link {{ $currentPage === $mobileKey ? 'is-active' : '' }}">
+                        <span class="mobile-bottom-icon">
+                            @if ($mobileKey === 'dashboard')
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12 12 4l9 8" /><path d="M5 10v10h14V10" /></svg>
+                            @elseif ($mobileKey === 'orders')
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="4" width="12" height="16" rx="2" /><path d="M9 4.5h6M9 9h6M9 13h6" /></svg>
+                            @elseif ($mobileKey === 'customers')
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="3" /><path d="M20 8v6M17 11h6" /></svg>
+                            @elseif ($mobileKey === 'invoices')
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H5V3h2Z" /><path d="M13 3v5h5M8 13h8M8 17h6" /></svg>
+                            @else
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16" /><path d="M7 15V9M12 15V5M17 15v-3" /></svg>
+                            @endif
+                        </span>
+                        <span class="mobile-bottom-label">{{ $pages[$mobileKey]['label'] }}</span>
+                    </a>
+                @endif
+            @endforeach
+        </nav>
 
 <el-dialog>
   <dialog id="dialog" aria-labelledby="dialog-title" class="fixed inset-0  size-auto max-h-none max-w-none overflow-y-auto bg-transparent backdrop:bg-transparent" style="margin:auto; padding:20px; border-radius:16px;">

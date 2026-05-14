@@ -14,6 +14,7 @@ use App\Models\JobPayment;
 use App\Models\Order;
 use App\Models\PaperStock;
 use App\Models\PaperType;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\PurchaseOrder as JobPurchaseOrder;
@@ -47,6 +48,8 @@ class ModuleRecordController extends Controller
 
     public function create(string $module): View
     {
+        $this->authorizeModuleAction(request(), $module, 'create');
+
         if ($module === 'orders') {
             return view('modules.orders-form', [
                 'module' => $module,
@@ -86,6 +89,8 @@ class ModuleRecordController extends Controller
 
     public function edit(string $module, int $id): View
     {
+        $this->authorizeModuleAction(request(), $module, 'edit');
+
         if ($module === 'orders') {
             $record = JobOrder::findOrFail($id);
 
@@ -123,6 +128,9 @@ class ModuleRecordController extends Controller
         abort_unless($config, 404);
 
         $record = $config['model']::findOrFail($id);
+        if ($module === 'roles') {
+            $record->loadMissing('permissions');
+        }
 
         return view('modules.create', [
             'module' => $module,
@@ -136,6 +144,8 @@ class ModuleRecordController extends Controller
 
     public function show(string $module, int $id): View
     {
+        $this->authorizeModuleAction(request(), $module, 'view');
+
         if ($module === 'orders') {
             $record = JobOrder::with([
                 'customer',
@@ -163,6 +173,8 @@ class ModuleRecordController extends Controller
 
     public function store(Request $request, string $module): RedirectResponse
     {
+        $this->authorizeModuleAction($request, $module, 'create');
+
         if ($module === 'orders') {
             $tenant = $this->tenant();
             $user = $request->user();
@@ -302,6 +314,8 @@ class ModuleRecordController extends Controller
 
     public function update(Request $request, string $module, int $id): RedirectResponse
     {
+        $this->authorizeModuleAction($request, $module, 'edit');
+
         if ($module === 'orders') {
             $data = $request->validate($this->printingOrderRules());
             $record = JobOrder::findOrFail($id);
@@ -444,6 +458,8 @@ class ModuleRecordController extends Controller
 
     public function destroy(string $module, int $id): RedirectResponse
     {
+        $this->authorizeModuleAction(request(), $module, 'delete');
+
         if ($module === 'orders') {
             $jobOrder = JobOrder::findOrFail($id);
             $this->deleteDesignFile($jobOrder->design_file_path);
@@ -474,6 +490,8 @@ class ModuleRecordController extends Controller
 
     public function updateOrderStatus(Request $request, int $id): RedirectResponse
     {
+        $this->authorizeModuleAction($request, 'orders', 'edit');
+
         $data = $request->validate([
             'status' => ['required', 'string'],
         ]);
@@ -496,6 +514,8 @@ class ModuleRecordController extends Controller
 
     public function export(string $module)
     {
+        $this->authorizeModuleAction(request(), $module, 'export');
+
         if ($module === 'orders') {
             $tenant = $this->tenant();
             $rows = array_merge([['Job Number', 'Customer ID', 'Job Title', 'Order Date', 'Due Date', 'Status', 'Estimated Total']], JobOrder::where('tenant_id', $tenant->id)->get(['job_number', 'customer_id', 'job_title', 'order_date', 'due_date', 'status', 'estimated_total_price'])->map(fn ($o) => [$o->job_number, $o->customer_id, $o->job_title, $o->order_date, $o->due_date, $o->status, $o->estimated_total_price])->all());
@@ -530,6 +550,8 @@ class ModuleRecordController extends Controller
 
     public function print(string $module, int $id)
     {
+        $this->authorizeModuleAction(request(), $module, 'print');
+
         $tenant = $this->tenant();
         $payload = $this->printPayload($module, $id, $tenant->id);
         abort_unless($payload, 404);
@@ -541,6 +563,8 @@ class ModuleRecordController extends Controller
 
     public function printBatchQuotations(Request $request)
     {
+        $this->authorizeModuleAction($request, 'quotations', 'print');
+
         $tenant = $this->tenant();
         if (count((array) $request->input('quotation_ids', [])) === 0) {
             return back()->with('error', 'Please select at least one quotation to print.');
@@ -585,6 +609,8 @@ class ModuleRecordController extends Controller
 
     public function previewOrderCalculation(Request $request)
     {
+        $this->authorizeModuleAction($request, 'orders', 'view');
+
         $payload = $request->validate([
             'page_size' => ['required', 'string'],
             'custom_width' => ['nullable', 'numeric', 'min:0.1'],
@@ -602,6 +628,8 @@ class ModuleRecordController extends Controller
 
     public function invoiceJobOrderSummary(int $id): JsonResponse
     {
+        $this->authorizeModuleAction(request(), 'invoices', 'view');
+
         $tenant = $this->tenant();
         $jobOrder = JobOrder::with('payments')
             ->where('tenant_id', $tenant->id)
@@ -649,6 +677,7 @@ class ModuleRecordController extends Controller
     private function options(): array
     {
         $tenant = $this->tenant();
+        $permissionsBySection = $this->permissionOptionsBySection();
 
         return [
             'customers' => Customer::where('tenant_id', $tenant->id)->pluck('company_name', 'id')->all(),
@@ -677,7 +706,72 @@ class ModuleRecordController extends Controller
             'ink_types' => InkType::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'standard_sheets' => StandardSheet::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
             'units' => Unit::where('tenant_id', $tenant->id)->pluck('name', 'id')->all(),
+            'permissions_by_section' => $permissionsBySection,
         ];
+    }
+
+    private function permissionOptionsBySection(): array
+    {
+        $sections = [
+            'customers', 'suppliers', 'products', 'raw-materials', 'warehouses',
+            'quotations', 'orders', 'purchases', 'invoices', 'deliveries',
+            'expenses', 'users', 'roles', 'paper-types', 'ink-types',
+            'standard-sheets', 'units', 'reports',
+        ];
+        $actions = ['view', 'create', 'edit', 'delete', 'print', 'export', 'approve'];
+
+        $options = [];
+        foreach ($sections as $section) {
+            $sectionOptions = [];
+            foreach ($actions as $action) {
+                $name = $section . '.' . $action;
+                $permission = Permission::firstOrCreate(
+                    ['name' => $name],
+                    ['guard_name' => 'web']
+                );
+                $sectionOptions[$permission->id] = str($action)->headline()->toString();
+            }
+            $options[str($section)->replace('-', ' ')->headline()->toString()] = $sectionOptions;
+        }
+
+        return $options;
+    }
+
+    private function authorizeModuleAction(Request $request, string $module, string $action): void
+    {
+        $section = $this->moduleSection($module);
+        if (! $section) {
+            return;
+        }
+
+        abort_unless(
+            $request->user()?->hasPermission($section . '.' . $action),
+            403,
+            'You do not have permission to perform this action.'
+        );
+    }
+
+    private function moduleSection(string $module): ?string
+    {
+        return [
+            'customers' => 'customers',
+            'suppliers' => 'suppliers',
+            'products' => 'products',
+            'raw-materials' => 'raw-materials',
+            'warehouses' => 'warehouses',
+            'quotations' => 'quotations',
+            'orders' => 'orders',
+            'purchases' => 'purchases',
+            'invoices' => 'invoices',
+            'expenses' => 'expenses',
+            'deliveries' => 'deliveries',
+            'users' => 'users',
+            'roles' => 'roles',
+            'paper-types' => 'paper-types',
+            'ink-types' => 'ink-types',
+            'standard-sheets' => 'standard-sheets',
+            'units' => 'units',
+        ][$module] ?? null;
     }
 
     private function printingOrderRules(): array
@@ -1500,15 +1594,20 @@ class ModuleRecordController extends Controller
                 'success' => 'Role created successfully.',
                 'fields' => [
                     ['name' => 'name', 'label' => 'Role Name', 'type' => 'text'],
+                    ['name' => 'permission_ids', 'label' => 'Permissions', 'type' => 'checkbox_group', 'source' => 'permissions_by_section'],
                 ],
                 'rules' => [
                     'name' => ['required', 'string', 'max:255'],
+                    'permission_ids' => ['nullable', 'array'],
+                    'permission_ids.*' => ['integer', 'exists:permissions,id'],
                 ],
                 'payload' => fn ($data, $tenant) => [
                     'tenant_id' => $tenant->id,
                     'name' => $data['name'],
                     'guard_name' => 'web',
                 ],
+                'after_store' => fn (\App\Models\Role $role, array $data) => $role->permissions()->sync($data['permission_ids'] ?? []),
+                'after_update' => fn (\App\Models\Role $role, array $data) => $role->permissions()->sync($data['permission_ids'] ?? []),
                 'export' => fn ($tenant) => array_merge([['Role Name']], \App\Models\Role::where('tenant_id', $tenant->id)->get(['name'])->map(fn ($r) => [$r->name])->all()),
             ],
         ][$module] ?? null;
