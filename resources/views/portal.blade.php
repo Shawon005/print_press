@@ -188,7 +188,7 @@
 
                       
 
-                        @if (!empty($pageData['feature_cards']))
+                        <!-- @if (!empty($pageData['feature_cards']))
                             <section class="grid gap-6 xl:grid-cols-3">
                                 @foreach ($pageData['feature_cards'] as $card)
                                     <article class="surface-card p-6">
@@ -198,7 +198,7 @@
                                     </article>
                                 @endforeach
                             </section>
-                        @endif
+                        @endif -->
 
                         @if ($currentPage === 'settings' && !empty($pageData['settings_tabs']))
                             <section class="grid gap-6" x-data="{ activeTab: '{{ $pageData['settings_tabs'][0]['key'] ?? 'paper-types' }}' }">
@@ -391,7 +391,7 @@
                                             <input type="number" step="0.01" min="0.01" name="body_width_mm" value="60" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Height (mm)</span>
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Body Length (mm)</span>
                                             <input type="number" step="0.01" min="0.01" name="body_height_mm" value="90" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
@@ -403,7 +403,7 @@
                                             <input type="number" step="0.01" min="0" name="bottom_flap_mm" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Side Flap (mm)</span>
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Height (mm)</span>
                                             <input type="number" step="0.01" min="0" name="side_flap_mm" value="16" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
@@ -419,16 +419,23 @@
                                             <input type="number" step="0.01" min="0" name="gap_mm" value="2.54" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width (mm)</span>
-                                            <input type="number" step="0.01" min="1" name="sheet_width_mm" value="762" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Width (IN)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_width_in" value="30" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height (mm)</span>
-                                            <input type="number" step="0.01" min="1" name="sheet_height_mm" value="508" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sheet Height (IN)</span>
+                                            <input type="number" step="0.01" min="1" name="sheet_height_in" value="20" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                         </label>
                                         <div class="md:col-span-2 flex items-end gap-3">
                                             <button type="button" id="btn-generate-die" class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20">Generate Shape</button>
                                             <button type="button" id="btn-calculate-layout" class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20">Calculate Nesting</button>
+                                            <span id="die-layout-loader" class="hidden items-center gap-2 text-sm font-semibold text-emerald-700">
+                                                <svg class="h-4 w-4 animate-spin text-emerald-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-90" fill="currentColor" d="M12 2a10 10 0 0 1 10 10h-4a6 6 0 0 0-6-6V2z"></path>
+                                                </svg>
+                                                <span>Calculating...</span>
+                                            </span>
                                         </div>
                                         <div class="md:col-span-2">
                                             <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Upload SVG Die-Line</label>
@@ -968,24 +975,40 @@
 
                     document.getElementById('btn-calculate-layout').addEventListener('click', async function () {
                         if (!activeShapeId) return alert('Generate or upload a die shape first.');
-                        const fd = new FormData(document.getElementById('die-generate-form'));
-                        const payload = {
-                            die_shape_id: activeShapeId,
-                            sheet_width_mm: Number(fd.get('sheet_width_mm')),
-                            sheet_height_mm: Number(fd.get('sheet_height_mm')),
-                            gap_mm: Number(fd.get('gap_mm')),
-                            allow_mirror: true
-                        };
-                        const res = await post(api.calculate_layout, payload);
-                        const l = res.layout;
-                        document.getElementById('die-box-count').textContent = l.box_count;
-                        document.getElementById('die-used-area').textContent = Number(l.used_area_mm2).toFixed(2) + ' mm²';
-                        document.getElementById('die-wastage-area').textContent = Number(l.wastage_area_mm2).toFixed(2) + ' mm²';
-                        document.getElementById('die-wastage-percent').textContent = Number(l.wastage_percent).toFixed(2) + '%';
-                        document.getElementById('die-layout-mode').textContent = l.layout_mode;
-                        document.getElementById('die-export-svg').href = res.export_svg_url;
-                        document.getElementById('die-export-pdf').href = res.export_pdf_url;
-                        drawPlacements(l);
+                        const calculateBtn = this;
+                        const loader = document.getElementById('die-layout-loader');
+                        calculateBtn.disabled = true;
+                        calculateBtn.classList.add('opacity-60', 'cursor-not-allowed');
+                        if (loader) loader.classList.remove('hidden');
+                        if (loader) loader.classList.add('flex');
+                        try {
+                            const fd = new FormData(document.getElementById('die-generate-form'));
+                            const payload = {
+                                die_shape_id: activeShapeId,
+                                sheet_width_mm: Number(fd.get('sheet_width_in') ? Number(fd.get('sheet_width_in')) * 25.4 : fd.get('sheet_width_mm')),
+                                sheet_height_mm: Number(fd.get('sheet_height_in') ? Number(fd.get('sheet_height_in')) * 25.4 : fd.get('sheet_height_mm')),
+                                gap_mm: Number(fd.get('gap_mm')),
+                                allow_mirror: true
+                            };
+                            const res = await post(api.calculate_layout, payload);
+                            const l = res.layout;
+                            document.getElementById('die-box-count').textContent = l.box_count;
+                            document.getElementById('die-used-area').textContent = Number(l.used_area_mm2).toFixed(2) + ' mm²';
+                            document.getElementById('die-wastage-area').textContent = Number(l.wastage_area_mm2).toFixed(2) + ' mm²';
+                            document.getElementById('die-wastage-percent').textContent = Number(l.wastage_percent).toFixed(2) + '%';
+                            document.getElementById('die-layout-mode').textContent = l.layout_mode;
+                            document.getElementById('die-export-svg').href = res.export_svg_url;
+                            document.getElementById('die-export-pdf').href = res.export_pdf_url;
+                            drawPlacements(l);
+                        } catch (error) {
+                            alert('Failed to calculate layout. Please try again.');
+                            console.error(error);
+                        } finally {
+                            calculateBtn.disabled = false;
+                            calculateBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+                            if (loader) loader.classList.remove('flex');
+                            if (loader) loader.classList.add('hidden');
+                        }
                     });
 
                     document.addEventListener('keydown', function (e) {

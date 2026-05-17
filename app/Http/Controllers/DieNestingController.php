@@ -39,7 +39,6 @@ class DieNestingController extends Controller
             'glue_flap_in' => ['nullable', 'numeric', 'min:0'],
             'bleed_in' => ['nullable', 'numeric', 'min:0'],
         ]);
-
         $mm = [
             'body_width_mm' => $this->resolveMm($data, 'body_width_mm', 'body_width_in'),
             'body_height_mm' => $this->resolveMm($data, 'body_height_mm', 'body_height_in'),
@@ -117,7 +116,7 @@ class DieNestingController extends Controller
             'gap_in' => ['nullable', 'numeric', 'min:0'],
             'allow_mirror' => ['nullable', 'boolean'],
         ]);
-
+     
         $shape = DieShape::findOrFail($data['die_shape_id']);
         $sheetW = $this->resolveMm($data, 'sheet_width_mm', 'sheet_width_in');
         $sheetH = $this->resolveMm($data, 'sheet_height_mm', 'sheet_height_in');

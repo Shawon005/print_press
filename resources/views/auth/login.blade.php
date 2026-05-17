@@ -9,7 +9,7 @@
     <body class="font-sans">
         <div class="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-10">
             <div class="grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-white/80 bg-white/90 shadow-[0_30px_90px_rgba(15,23,42,0.12)] lg:grid-cols-[1.1fr_0.9fr]">
-                <section class="hero-panel p-8 md:p-12">
+                <section class="hero-panel p-8 md:p-12 mble-block">
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--brand)]">Printing Press SaaS ERP</p>
                     <h1 class="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Manage quotation, production, finance, inventory, and delivery in one workspace.</h1>
                     <p class="mt-5 max-w-2xl text-base leading-7 text-slate-700">This project now includes a real ERP database foundation with seeded tenants, users, customers, suppliers, products, materials, orders, invoices, expenses, and deliveries.</p>
